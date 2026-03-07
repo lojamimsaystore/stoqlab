@@ -1,0 +1,27 @@
+{
+  "name": "stoqlab",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:generate": "turbo run db:generate --filter=@stoqlab/database",
+    "db:push": "turbo run db:push --filter=@stoqlab/database",
+    "db:studio": "turbo run db:studio --filter=@stoqlab/database"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0"
+  },
+  "packageManager": "npm@11.9.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

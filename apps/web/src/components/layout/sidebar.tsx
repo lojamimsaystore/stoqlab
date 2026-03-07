@@ -15,12 +15,14 @@ import {
   Settings,
   LogOut,
   X,
+  FolderOpen,
 } from "lucide-react";
 import { logoutAction } from "@/app/(dashboard)/actions";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/produtos", label: "Produtos", icon: Package },
+  { href: "/categorias", label: "Categorias", icon: FolderOpen },
   { href: "/estoque", label: "Estoque", icon: Boxes },
   { href: "/compras", label: "Compras", icon: ShoppingCart },
   { href: "/vendas", label: "Vendas", icon: Tag },

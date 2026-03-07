@@ -1,3 +1,98 @@
-export default function FornecedoresPage() {
-  return <div className="text-slate-500">Módulo de fornecedores — em breve</div>;
+import Link from "next/link";
+import { Plus, Truck, Pencil, Phone, Mail } from "lucide-react";
+import { supabaseAdmin } from "@/lib/supabase/service";
+import { getTenantId } from "@/lib/auth";
+import { DeleteSupplierButton } from "./delete-supplier-button";
+
+export default async function FornecedoresPage() {
+  const tenantId = await getTenantId();
+
+  const { data: suppliers } = await supabaseAdmin
+    .from("suppliers")
+    .select("id, name, cnpj, phone, email, notes, is_active")
+    .eq("tenant_id", tenantId)
+    .is("deleted_at", null)
+    .order("name");
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">Fornecedores</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Gerencie seus fornecedores e contatos.
+          </p>
+        </div>
+        <Link
+          href="/fornecedores/novo"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+        >
+          <Plus size={16} />
+          Novo fornecedor
+        </Link>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        {!suppliers?.length ? (
+          <div className="py-16 flex flex-col items-center gap-2 text-slate-400">
+            <Truck size={36} className="text-slate-300" />
+            <p className="text-sm">Nenhum fornecedor cadastrado</p>
+            <Link href="/fornecedores/novo" className="text-sm text-blue-600 hover:text-blue-700 font-medium mt-1">
+              Cadastrar primeiro fornecedor
+            </Link>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 text-left border-b border-slate-100">
+                <th className="px-4 py-3 font-medium text-slate-600">Nome</th>
+                <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell">Contato</th>
+                <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">CNPJ</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {suppliers.map((s) => (
+                <tr key={s.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-slate-900">{s.name}</p>
+                    {s.notes && (
+                      <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[200px]">{s.notes}</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <div className="space-y-0.5">
+                      {s.phone && (
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <Phone size={12} />
+                          <span>{s.phone}</span>
+                        </div>
+                      )}
+                      {s.email && (
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <Mail size={12} />
+                          <span>{s.email}</span>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 hidden sm:table-cell text-slate-500 font-mono text-xs">
+                    {s.cnpj ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-3">
+                      <Link href={`/fornecedores/${s.id}/editar`} className="text-slate-400 hover:text-blue-600 transition-colors">
+                        <Pencil size={16} />
+                      </Link>
+                      <DeleteSupplierButton id={s.id} name={s.name} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
 }

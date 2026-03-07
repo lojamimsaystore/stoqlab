@@ -217,14 +217,23 @@ export async function updateProductAction(
 
 export async function deleteProductAction(id: string) {
   const tenantId = await getTenantId();
+  const deletedAt = new Date().toISOString();
+
+  // Soft-delete em cascata: variações primeiro, depois o produto
+  await supabaseAdmin
+    .from("product_variants")
+    .update({ deleted_at: deletedAt })
+    .eq("product_id", id)
+    .eq("tenant_id", tenantId);
 
   await supabaseAdmin
     .from("products")
-    .update({ deleted_at: new Date().toISOString() })
+    .update({ deleted_at: deletedAt })
     .eq("id", id)
     .eq("tenant_id", tenantId);
 
   revalidatePath("/produtos");
+  revalidatePath("/estoque");
 }
 
 // ─── Criar variação adicional ─────────────────────────────────

@@ -33,7 +33,7 @@ export default async function RelatoriosPage() {
       ),
     supabaseAdmin
       .from("inventory")
-      .select("quantity, product_variants(products(categories(name)))")
+      .select("quantity, product_variants(deleted_at, products(deleted_at, categories(name)))")
       .eq("tenant_id", tenantId),
     supabaseAdmin
       .from("purchases")
@@ -55,7 +55,13 @@ export default async function RelatoriosPage() {
     ? sales.reduce((s, v) => s + Number(v.gross_margin ?? 0), 0) / sales.length
     : 0;
 
-  const totalStock = (inventory ?? []).reduce((s, i) => s + i.quantity, 0);
+  // Filtra inventário órfão (variação ou produto deletado)
+  const activeInventory = (inventory ?? []).filter((i) => {
+    const v = i.product_variants as { deleted_at: string | null; products: { deleted_at: string | null } | null } | null;
+    return !v?.deleted_at && !v?.products?.deleted_at;
+  });
+
+  const totalStock = activeInventory.reduce((s, i) => s + i.quantity, 0);
   const totalPurchases = (purchases ?? []).reduce((s, p) =>
     s + Number(p.products_cost) + Number(p.freight_cost) + Number(p.other_costs), 0);
 
@@ -87,10 +93,10 @@ export default async function RelatoriosPage() {
   }
   const topProducts = [...productSales.values()].sort((a, b) => b.qty - a.qty).slice(0, 10);
 
-  // Estoque por categoria
+  // Estoque por categoria (apenas ativos)
   const catStock = new Map<string, number>();
-  for (const inv of inventory ?? []) {
-    const v = inv.product_variants as { products: { categories: { name: string } | null } | null } | null;
+  for (const inv of activeInventory) {
+    const v = inv.product_variants as { products: { deleted_at: string | null; categories: { name: string } | null } | null } | null;
     const cat = v?.products?.categories?.name ?? "Sem categoria";
     catStock.set(cat, (catStock.get(cat) ?? 0) + inv.quantity);
   }

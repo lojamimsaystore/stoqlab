@@ -226,12 +226,6 @@ export default async function DashboardPage() {
             <p className="text-slate-400 text-xs mt-1">
               As vendas aparecerão aqui assim que forem registradas
             </p>
-            <a
-              href="/vendas/nova"
-              className="mt-4 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
-            >
-              Registrar venda
-            </a>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">

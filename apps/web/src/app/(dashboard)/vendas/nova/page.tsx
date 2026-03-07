@@ -12,7 +12,7 @@ export default async function NovaVendaPage() {
     .from("product_variants")
     .select(`
       id, color, size, sku, sale_price,
-      products!inner(name),
+      products!inner(name, deleted_at),
       inventory(quantity)
     `)
     .eq("tenant_id", tenantId)
@@ -20,10 +20,10 @@ export default async function NovaVendaPage() {
 
   const variants = (variantRows ?? [])
     .map((v) => {
-      const product = v.products as { name: string } | null;
+      const product = v.products as { name: string; deleted_at: string | null } | null;
       const invList = v.inventory as { quantity: number }[] | null;
       const stock = (invList ?? []).reduce((s, i) => s + i.quantity, 0);
-      if (!product || stock <= 0) return null;
+      if (!product || product.deleted_at || stock <= 0) return null;
       return {
         id: v.id,
         color: v.color,

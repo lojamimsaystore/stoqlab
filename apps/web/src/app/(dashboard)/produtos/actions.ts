@@ -236,6 +236,29 @@ export async function deleteProductAction(id: string) {
   revalidatePath("/estoque");
 }
 
+// Limpa variações órfãs (produto deletado mas variação sem deleted_at)
+export async function cleanOrphanVariantsAction(): Promise<void> {
+  const tenantId = await getTenantId();
+
+  const { data: deletedProducts } = await supabaseAdmin
+    .from("products")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .not("deleted_at", "is", null);
+
+  if (!deletedProducts?.length) return;
+
+  const ids = deletedProducts.map((p) => p.id);
+
+  await supabaseAdmin
+    .from("product_variants")
+    .update({ deleted_at: new Date().toISOString() })
+    .in("product_id", ids)
+    .is("deleted_at", null);
+
+  revalidatePath("/estoque");
+}
+
 // ─── Criar variação adicional ─────────────────────────────────
 
 export type VariantState = { error?: string };

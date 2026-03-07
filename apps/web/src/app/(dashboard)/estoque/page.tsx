@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { EstoqueTable } from "./estoque-table";
+import { CleanOrphansButton } from "./clean-orphans-button";
 
 export default async function EstoquePage() {
   const tenantId = await getTenantId();
@@ -9,7 +10,7 @@ export default async function EstoquePage() {
     .from("product_variants")
     .select(`
       id, color, size, sku, min_stock,
-      products!inner(name, categories(name)),
+      products!inner(name, deleted_at, categories(name)),
       inventory(id, quantity, location_id, locations(name))
     `)
     .eq("tenant_id", tenantId)
@@ -18,9 +19,11 @@ export default async function EstoquePage() {
 
   // Expande cada variação por localização com estoque
   const tableRows = (variants ?? []).flatMap((v) => {
-    const product = v.products as { name: string; categories: { name: string } | null } | null;
+    const product = v.products as { name: string; deleted_at: string | null; categories: { name: string } | null } | null;
     const invList = v.inventory as { id: string; quantity: number; location_id: string; locations: { name: string } | null }[] | null;
 
+    // Ignora variações cujo produto foi deletado (órfãos)
+    if (product?.deleted_at) return [];
     if (!invList?.length) return [];
 
     return invList.map((inv) => ({
@@ -38,6 +41,12 @@ export default async function EstoquePage() {
     }));
   }).sort((a, b) => a.quantity - b.quantity);
 
+  // Conta órfãos para exibir alerta
+  const orphanCount = (variants ?? []).filter((v) => {
+    const p = v.products as { deleted_at: string | null } | null;
+    return !!p?.deleted_at;
+  }).length;
+
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
@@ -46,6 +55,7 @@ export default async function EstoquePage() {
           Visualize e ajuste o estoque de todas as variações.
         </p>
       </div>
+      <CleanOrphansButton count={orphanCount} />
       <EstoqueTable rows={tableRows} />
     </div>
   );

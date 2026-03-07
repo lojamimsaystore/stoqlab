@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { changeTenantPlanAction, toggleTenantActiveAction } from "./actions";
+import { changeTenantPlanAction, toggleTenantActiveAction, deleteTenantAction } from "./actions";
+import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const PLAN_LABELS: Record<string, string> = {
@@ -28,6 +29,7 @@ type Tenant = {
   is_active: boolean | null;
   user_count: number;
   created_at: string;
+  owner: { name: string; email: string } | null;
 };
 
 export function TenantRow({ tenant }: { tenant: Tenant }) {
@@ -48,6 +50,14 @@ export function TenantRow({ tenant }: { tenant: Tenant }) {
     setSaving(false);
   }
 
+  async function handleDelete() {
+    if (!confirm(`Excluir o lojista "${tenant.name}"? Esta ação não pode ser desfeita.`)) return;
+    setSaving(true);
+    await deleteTenantAction(tenant.id);
+    router.refresh();
+    setSaving(false);
+  }
+
   const isActive = tenant.is_active !== false;
 
   return (
@@ -57,6 +67,16 @@ export function TenantRow({ tenant }: { tenant: Tenant }) {
         <p className="text-xs text-slate-400 mt-0.5">
           {new Date(tenant.created_at).toLocaleDateString("pt-BR")}
         </p>
+      </td>
+      <td className="px-4 py-3">
+        {tenant.owner ? (
+          <>
+            <span className="text-sm font-medium text-slate-800">{tenant.owner.name}</span>
+            <p className="text-xs text-slate-400 mt-0.5">{tenant.owner.email}</p>
+          </>
+        ) : (
+          <span className="text-xs text-slate-400">—</span>
+        )}
       </td>
       <td className="px-4 py-3">
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${PLAN_COLORS[tenant.plan] ?? "bg-slate-100 text-slate-600"}`}>
@@ -91,13 +111,23 @@ export function TenantRow({ tenant }: { tenant: Tenant }) {
         </span>
       </td>
       <td className="px-4 py-3 text-right">
-        <button
-          onClick={handleToggle}
-          disabled={saving}
-          className="text-xs text-slate-400 hover:text-slate-700 font-medium disabled:opacity-50"
-        >
-          {isActive ? "Desativar" : "Ativar"}
-        </button>
+        <div className="flex items-center justify-end gap-3">
+          <button
+            onClick={handleToggle}
+            disabled={saving}
+            className="text-xs text-slate-400 hover:text-slate-700 font-medium disabled:opacity-50"
+          >
+            {isActive ? "Desativar" : "Ativar"}
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={saving}
+            className="text-slate-300 hover:text-red-600 transition-colors disabled:opacity-50"
+            title="Excluir lojista"
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
       </td>
     </tr>
   );

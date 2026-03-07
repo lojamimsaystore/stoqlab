@@ -3,28 +3,42 @@ import { TenantRow } from "./tenant-row";
 import { Building2, Users, CreditCard, Activity } from "lucide-react";
 
 export default async function AdminPage() {
-  const [{ data: tenants }, { data: users }] = await Promise.all([
+  const [{ data: tenants }, { data: users }, { data: authData }] = await Promise.all([
     supabaseAdmin
       .from("tenants")
       .select("id, name, plan, trial_ends_at, is_active, created_at")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }),
     supabaseAdmin
       .from("users")
-      .select("id, tenant_id, role")
+      .select("id, tenant_id, name, role")
       .neq("role", "master")
       .is("deleted_at", null),
+    supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
   ]);
 
-  // Count users per tenant
+  // Email map from auth
+  const emailMap: Record<string, string> = {};
+  for (const u of authData?.users ?? []) {
+    emailMap[u.id] = u.email ?? "";
+  }
+
+  // Count users per tenant + find owner
   const userCountMap: Record<string, number> = {};
+  const ownerMap: Record<string, { name: string; email: string }> = {};
   for (const u of users ?? []) {
-    if (u.tenant_id) userCountMap[u.tenant_id] = (userCountMap[u.tenant_id] ?? 0) + 1;
+    if (!u.tenant_id) continue;
+    userCountMap[u.tenant_id] = (userCountMap[u.tenant_id] ?? 0) + 1;
+    if (u.role === "owner") {
+      ownerMap[u.tenant_id] = { name: u.name, email: emailMap[u.id] ?? "" };
+    }
   }
 
   const tenantRows = (tenants ?? []).map((t) => ({
     ...t,
     is_active: t.is_active ?? true,
     user_count: userCountMap[t.id] ?? 0,
+    owner: ownerMap[t.id] ?? null,
   }));
 
   // Stats
@@ -94,6 +108,7 @@ export default async function AdminPage() {
             <thead>
               <tr className="bg-slate-50 text-left border-b border-slate-100">
                 <th className="px-4 py-2.5 font-medium text-slate-600">Loja</th>
+                <th className="px-4 py-2.5 font-medium text-slate-600">Proprietário</th>
                 <th className="px-4 py-2.5 font-medium text-slate-600">Plano atual</th>
                 <th className="px-4 py-2.5 font-medium text-slate-600 text-center">Usuários</th>
                 <th className="px-4 py-2.5 font-medium text-slate-600">Alterar plano</th>
@@ -104,7 +119,7 @@ export default async function AdminPage() {
             <tbody className="divide-y divide-slate-100">
               {tenantRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400 text-sm">
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400 text-sm">
                     Nenhum lojista cadastrado.
                   </td>
                 </tr>

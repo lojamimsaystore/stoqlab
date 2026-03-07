@@ -48,6 +48,26 @@ export async function changeTenantPlanAction(
   return {};
 }
 
+export async function deleteTenantAction(
+  tenantId: string
+): Promise<{ error?: string }> {
+  try {
+    await assertMaster();
+  } catch (e: unknown) {
+    return { error: e instanceof Error ? e.message : "Erro" };
+  }
+
+  const { error } = await supabaseAdmin
+    .from("tenants")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", tenantId);
+
+  if (error) return { error: "Erro ao excluir lojista." };
+
+  revalidatePath("/admin");
+  return {};
+}
+
 export async function toggleTenantActiveAction(
   tenantId: string,
   active: boolean

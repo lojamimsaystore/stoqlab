@@ -1,3 +1,35 @@
-export default function ConfiguracoesPage() {
-  return <div className="text-slate-500">Configurações — em breve</div>;
+import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/service";
+import { getTenantId } from "@/lib/auth";
+import { SettingsTabs } from "./settings-tabs";
+
+export default async function ConfiguracoesPage() {
+  const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (!authUser) return null;
+
+  const tenantId = await getTenantId();
+
+  const [{ data: tenant }, { data: userProfile }, { data: locations }, { data: users }] =
+    await Promise.all([
+      supabaseAdmin.from("tenants").select("id, name, plan, trial_ends_at, settings").eq("id", tenantId).single(),
+      supabaseAdmin.from("users").select("id, name, role").eq("id", authUser.id).single(),
+      supabaseAdmin.from("locations").select("id, name, type").eq("tenant_id", tenantId).is("deleted_at", null).order("name"),
+      supabaseAdmin.from("users").select("id, name, role, is_active").eq("tenant_id", tenantId).is("deleted_at", null).order("name"),
+    ]);
+
+  return (
+    <div className="space-y-6 max-w-5xl">
+      <div>
+        <h1 className="text-xl font-semibold text-slate-900">Configurações</h1>
+        <p className="text-sm text-slate-500 mt-1">Gerencie sua loja, conta e equipe.</p>
+      </div>
+      <SettingsTabs
+        tenant={{ ...tenant!, settings: (tenant?.settings as Record<string, string>) ?? {} }}
+        user={{ id: authUser.id, name: userProfile?.name ?? "", email: authUser.email ?? "", role: userProfile?.role ?? "seller" }}
+        locations={locations ?? []}
+        users={users ?? []}
+      />
+    </div>
+  );
 }

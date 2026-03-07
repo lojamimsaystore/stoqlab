@@ -17,9 +17,12 @@ export default async function DashboardLayout({
 
   const { data: profile } = await supabaseAdmin
     .from("users")
-    .select("name, tenants(name)")
+    .select("name, role, tenants(name)")
     .eq("id", user.id)
     .single();
+
+  // Master users have their own panel
+  if (profile?.role === "master") redirect("/admin");
 
   const userName = profile?.name ?? "Usuário";
   const tenantName =

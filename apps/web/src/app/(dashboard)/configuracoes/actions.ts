@@ -109,6 +109,7 @@ export async function deleteLocationAction(id: string): Promise<void> {
 
 // ─── Usuários ─────────────────────────────────────────────────
 
+// master is excluded — cannot be invited through tenant settings
 const VALID_ROLES = ["owner", "manager", "seller", "stock_operator"] as const;
 
 export async function inviteUserAction(

@@ -20,15 +20,24 @@ export function SettingsTabs(props: {
   tenant: { id: string; name: string; plan: string; trial_ends_at: string | null; settings: Record<string, string> };
   user: { id: string; name: string; email: string; role: string };
   locations: { id: string; name: string; type: string }[];
-  users: { id: string; name: string; role: string; is_active: boolean }[];
+  users: { id: string; name: string; email: string; role: string; is_active: boolean }[];
+  currentUserRole: string;
 }) {
+  const isOwner = props.currentUserRole === "owner";
   const [active, setActive] = useState("loja");
+
+  const visibleTabs = TABS.filter((tab) => {
+    if (tab.id === "usuarios" || tab.id === "plano" || tab.id === "loja" || tab.id === "localizacoes") {
+      return isOwner;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">
       {/* Tab bar */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto">
-        {TABS.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActive(tab.id)}

@@ -36,7 +36,7 @@ const PLANS = [
 ];
 
 const PLAN_LABELS: Record<string, string> = {
-  trial: "Free Trial", starter: "Starter", pro: "Pro", enterprise: "Enterprise",
+  trial: "Free Trial", starter: "Starter", pro: "Pro", enterprise: "Enterprise", vitalicio: "Vitalício",
 };
 
 export function TabPlano({ tenant }: {
@@ -54,6 +54,15 @@ export function TabPlano({ tenant }: {
         <p className="text-sm text-amber-600 mb-5">
           ⚠️ Trial expira em: {new Date(tenant.trial_ends_at).toLocaleDateString("pt-BR")}
         </p>
+      )}
+      {currentPlan === "vitalicio" && (
+        <div className="mb-5 flex items-center gap-3 bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-xl px-4 py-3">
+          <span className="text-xl">♾️</span>
+          <div>
+            <p className="text-sm font-semibold text-violet-800">Plano Vitalício ativo</p>
+            <p className="text-xs text-violet-600">Acesso completo e permanente. Sem cobranças.</p>
+          </div>
+        </div>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-5">

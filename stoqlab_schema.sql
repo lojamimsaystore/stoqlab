@@ -24,8 +24,8 @@ $$ LANGUAGE plpgsql;
 -- ─────────────────────────────────────────────────────────────
 --  ENUMS
 -- ─────────────────────────────────────────────────────────────
-CREATE TYPE plan_type AS ENUM ('trial', 'starter', 'pro', 'enterprise');
-CREATE TYPE user_role AS ENUM ('owner', 'manager', 'seller', 'stock_operator');
+CREATE TYPE plan_type AS ENUM ('trial', 'starter', 'pro', 'enterprise', 'vitalicio');
+CREATE TYPE user_role AS ENUM ('owner', 'manager', 'seller', 'stock_operator', 'master');
 CREATE TYPE location_type AS ENUM ('store', 'warehouse');
 CREATE TYPE product_status AS ENUM ('active', 'archived', 'draft');
 CREATE TYPE movement_type AS ENUM ('purchase', 'sale', 'transfer', 'adjustment', 'return', 'loss');

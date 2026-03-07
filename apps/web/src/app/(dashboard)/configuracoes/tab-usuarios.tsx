@@ -25,7 +25,7 @@ const ROLE_COLOR: Record<string, string> = {
 };
 
 export function TabUsuarios({ users, currentUserId }: {
-  users: { id: string; name: string; role: string; is_active: boolean }[];
+  users: { id: string; name: string; email: string; role: string; is_active: boolean }[];
   currentUserId: string;
 }) {
   const [state, formAction] = useFormState(inviteUserAction, {});
@@ -54,6 +54,7 @@ export function TabUsuarios({ users, currentUserId }: {
           <thead>
             <tr className="bg-slate-50 text-left border-b border-slate-100">
               <th className="px-4 py-2 font-medium text-slate-600">Nome</th>
+              <th className="px-4 py-2 font-medium text-slate-600">E-mail</th>
               <th className="px-4 py-2 font-medium text-slate-600">Perfil</th>
               <th className="px-4 py-2 font-medium text-slate-600 text-center">Status</th>
               <th className="px-4 py-2" />
@@ -68,6 +69,7 @@ export function TabUsuarios({ users, currentUserId }: {
                     <span className="ml-2 text-xs text-slate-400">(você)</span>
                   )}
                 </td>
+                <td className="px-4 py-2.5 text-slate-500 text-xs">{u.email}</td>
                 <td className="px-4 py-2.5">
                   {u.id === currentUserId ? (
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_COLOR[u.role] ?? ""}`}>

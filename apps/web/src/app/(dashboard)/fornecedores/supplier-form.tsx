@@ -2,6 +2,7 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import Link from "next/link";
+import { SupplierFields } from "./supplier-fields";
 
 type State = { error?: string };
 
@@ -40,82 +41,7 @@ export function SupplierForm({
 
   return (
     <form action={formAction} className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Nome <span className="text-red-500">*</span>
-          </label>
-          <input
-            name="name"
-            required
-            defaultValue={defaultValues?.name}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Nome do fornecedor"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            CNPJ
-          </label>
-          <input
-            name="cnpj"
-            defaultValue={defaultValues?.cnpj ?? ""}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="00.000.000/0000-00"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Telefone / WhatsApp
-          </label>
-          <input
-            name="phone"
-            defaultValue={defaultValues?.phone ?? ""}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="(00) 00000-0000"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            E-mail
-          </label>
-          <input
-            name="email"
-            type="email"
-            defaultValue={defaultValues?.email ?? ""}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="contato@fornecedor.com"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Endereço
-          </label>
-          <input
-            name="address"
-            defaultValue={defaultValues?.address ?? ""}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Rua, número, cidade..."
-          />
-        </div>
-
-        <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Observações
-          </label>
-          <textarea
-            name="notes"
-            defaultValue={defaultValues?.notes ?? ""}
-            rows={3}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            placeholder="Condições de pagamento, prazo de entrega..."
-          />
-        </div>
-      </div>
+      <SupplierFields defaultValues={defaultValues} />
 
       {state.error && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">

@@ -3,39 +3,66 @@ import { Plus, Users, Pencil, Phone, Mail } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { DeleteCustomerButton } from "./delete-customer-button";
+import { SearchInput } from "@/components/ui/search-input";
+import { Suspense } from "react";
 
-export default async function ClientesPage() {
+export default async function ClientesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const tenantId = await getTenantId();
+  const { q } = await searchParams;
 
-  const { data: customers } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("customers")
     .select("id, name, phone, email, cpf, notes")
     .eq("tenant_id", tenantId)
     .is("deleted_at", null)
     .order("name");
 
+  if (q) {
+    query = query.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,cpf.ilike.%${q}%`);
+  }
+
+  const { data: customers } = await query;
+
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Clientes</h1>
-          <p className="text-sm text-slate-500 mt-1">Cadastro e histórico de clientes.</p>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {customers?.length ?? 0} cliente{(customers?.length ?? 0) !== 1 ? "s" : ""}
+            {q ? ` encontrado${(customers?.length ?? 0) !== 1 ? "s" : ""} para "${q}"` : " cadastrado" + ((customers?.length ?? 0) !== 1 ? "s" : "")}
+          </p>
         </div>
-        <Link href="/clientes/novo"
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+        <Link
+          href="/clientes/novo"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+        >
           <Plus size={16} />
           Novo cliente
         </Link>
       </div>
 
+      {/* Busca */}
+      <Suspense>
+        <SearchInput placeholder="Buscar por nome, e-mail, telefone ou CPF…" />
+      </Suspense>
+
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         {!customers?.length ? (
           <div className="py-16 flex flex-col items-center gap-2 text-slate-400">
             <Users size={36} className="text-slate-300" />
-            <p className="text-sm">Nenhum cliente cadastrado</p>
-            <Link href="/clientes/novo" className="text-sm text-blue-600 hover:text-blue-700 font-medium mt-1">
-              Cadastrar primeiro cliente
-            </Link>
+            <p className="text-sm font-medium text-slate-500">
+              {q ? `Nenhum cliente encontrado para "${q}"` : "Nenhum cliente cadastrado"}
+            </p>
+            {!q && (
+              <Link href="/clientes/novo" className="text-sm text-blue-600 hover:text-blue-700 font-medium mt-1">
+                Cadastrar primeiro cliente
+              </Link>
+            )}
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -49,7 +76,7 @@ export default async function ClientesPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {customers.map((c) => (
-                <tr key={c.id} className="hover:bg-slate-50">
+                <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900">{c.name}</p>
                     {c.notes && <p className="text-xs text-slate-400 truncate max-w-[180px]">{c.notes}</p>}
@@ -63,8 +90,12 @@ export default async function ClientesPage() {
                   <td className="px-4 py-3 hidden sm:table-cell text-slate-500 font-mono text-xs">{c.cpf ?? "—"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      <Link href={`/clientes/${c.id}/editar`} className="text-slate-400 hover:text-blue-600 transition-colors">
-                        <Pencil size={16} />
+                      <Link
+                        href={`/clientes/${c.id}/editar`}
+                        aria-label="Editar cliente"
+                        className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded"
+                      >
+                        <Pencil size={15} />
                       </Link>
                       <DeleteCustomerButton id={c.id} name={c.name} />
                     </div>

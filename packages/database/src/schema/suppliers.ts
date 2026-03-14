@@ -21,6 +21,7 @@ export const suppliers = pgTable(
     phone: varchar("phone", { length: 30 }),
     email: varchar("email", { length: 150 }),
     address: text("address"),
+    complement: varchar("complement", { length: 150 }),
     notes: text("notes"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })

@@ -99,7 +99,7 @@ export async function deleteLocationAction(id: string): Promise<void> {
   const tenantId = await getTenantId();
   await supabaseAdmin
     .from("locations")
-    .update({ deleted_at: new Date().toISOString() })
+    .delete()
     .eq("id", id)
     .eq("tenant_id", tenantId);
 
@@ -128,7 +128,7 @@ export async function inviteUserAction(
   const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     email_confirm: true,
-    password: Math.random().toString(36).slice(-10) + "A1!",
+    password: Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(36)).join("").slice(0, 16) + "A1!",
   });
 
   if (authError) {

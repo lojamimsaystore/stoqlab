@@ -51,5 +51,96 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Scrollbar personalizada */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400;
+  }
+
+  /* Seleção de texto */
+  ::selection {
+    @apply bg-blue-100 text-blue-900;
+  }
+}
+
+@layer utilities {
+  /* Animações para modais */
+  @keyframes in {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes out {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.95); }
+  }
+  .animate-in {
+    animation: in 150ms ease-out;
+  }
+  .animate-out {
+    animation: out 100ms ease-in;
+  }
+  .fade-in-0 { animation-name: fade-in; }
+  .fade-out-0 { animation-name: fade-out; }
+  .zoom-in-95 { animation-name: zoom-in-95; }
+  .zoom-out-95 { animation-name: zoom-out-95; }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  @keyframes zoom-in-95 {
+    from { transform: scale(0.95); }
+    to { transform: scale(1); }
+  }
+  @keyframes zoom-out-95 {
+    from { transform: scale(1); }
+    to { transform: scale(0.95); }
+  }
+  @keyframes slide-in-from-top {
+    from { transform: translateY(-4px); }
+    to { transform: translateY(0); }
+  }
+  @keyframes slide-in-from-bottom {
+    from { transform: translateY(4px); }
+    to { transform: translateY(0); }
+  }
+  @keyframes slide-in-from-left {
+    from { transform: translateX(-4px); }
+    to { transform: translateX(0); }
+  }
+  @keyframes slide-in-from-right {
+    from { transform: translateX(4px); }
+    to { transform: translateX(0); }
+  }
+  .slide-in-from-top-2 { animation-name: slide-in-from-top; }
+  .slide-in-from-bottom-2 { animation-name: slide-in-from-bottom; }
+  .slide-in-from-left-2 { animation-name: slide-in-from-left; }
+  .slide-in-from-right-2 { animation-name: slide-in-from-right; }
+  .slide-out-to-top-\[48\%\] { animation-name: slide-in-from-bottom; }
+  .slide-in-from-top-\[48\%\] { animation-name: slide-in-from-top; }
+  .slide-in-from-left-1\/2 { animation-name: slide-in-from-left; }
+  .slide-out-to-left-1\/2 { animation-name: slide-in-from-right; }
+
+  /* Tabular numbers */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }

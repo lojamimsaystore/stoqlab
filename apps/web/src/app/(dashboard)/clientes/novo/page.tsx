@@ -1,16 +1,15 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { createCustomerAction } from "../actions";
 import { CustomerForm } from "../customer-form";
 
 export default function NovoClientePage() {
   return (
     <div className="space-y-6 max-w-2xl">
-      <nav className="flex items-center gap-1 text-sm text-slate-500">
-        <Link href="/clientes" className="hover:text-slate-700">Clientes</Link>
-        <ChevronRight size={14} />
-        <span className="text-slate-900 font-medium">Novo cliente</span>
-      </nav>
+      <Link href="/clientes" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+        <ArrowLeft size={15} />
+        Voltar
+      </Link>
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Novo cliente</h1>
         <p className="text-sm text-slate-500 mt-1">Preencha os dados do cliente.</p>

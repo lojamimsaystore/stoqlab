@@ -1,19 +1,19 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { deleteCustomerAction } from "./actions";
 
 export function DeleteCustomerButton({ id, name }: { id: string; name: string }) {
   const router = useRouter();
-  async function handle() {
-    if (!confirm(`Remover cliente "${name}"?`)) return;
-    await deleteCustomerAction(id);
-    router.refresh();
-  }
   return (
-    <button onClick={handle} className="text-slate-400 hover:text-red-600 transition-colors">
-      <Trash2 size={16} />
-    </button>
+    <ConfirmDeleteDialog
+      itemName={name}
+      title="Remover cliente?"
+      description={`O cliente "${name}" será removido permanentemente. Esta ação não pode ser desfeita.`}
+      successMessage={`Cliente "${name}" removido com sucesso`}
+      onConfirm={() => deleteCustomerAction(id)}
+      onSuccess={() => router.refresh()}
+    />
   );
 }

@@ -25,7 +25,7 @@ export async function createCategoryAction(
     return { error: "Erro ao criar categoria." };
   }
 
-  revalidatePath("/categorias");
+  revalidatePath("/", "layout");
   return {};
 }
 
@@ -49,7 +49,7 @@ export async function updateCategoryAction(
     return { error: "Erro ao atualizar categoria." };
   }
 
-  revalidatePath("/categorias");
+  revalidatePath("/", "layout");
   return {};
 }
 
@@ -57,9 +57,9 @@ export async function deleteCategoryAction(id: string): Promise<void> {
   const tenantId = await getTenantId();
   await supabaseAdmin
     .from("categories")
-    .update({ deleted_at: new Date().toISOString() })
+    .delete()
     .eq("id", id)
     .eq("tenant_id", tenantId);
 
-  revalidatePath("/categorias");
+  revalidatePath("/", "layout");
 }

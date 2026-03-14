@@ -3,24 +3,39 @@ import { Plus, Truck, Pencil, Phone, Mail } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { DeleteSupplierButton } from "./delete-supplier-button";
+import { SearchInput } from "@/components/ui/search-input";
+import { Suspense } from "react";
 
-export default async function FornecedoresPage() {
+export default async function FornecedoresPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const tenantId = await getTenantId();
+  const { q } = await searchParams;
 
-  const { data: suppliers } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("suppliers")
     .select("id, name, cnpj, phone, email, notes, is_active")
     .eq("tenant_id", tenantId)
     .is("deleted_at", null)
     .order("name");
 
+  if (q) {
+    query = query.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,cnpj.ilike.%${q}%`);
+  }
+
+  const { data: suppliers } = await query;
+  const total = suppliers?.length ?? 0;
+
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Fornecedores</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Gerencie seus fornecedores e contatos.
+          <p className="text-sm text-slate-500 mt-0.5">
+            {total} fornecedor{total !== 1 ? "es" : ""}
+            {q ? ` encontrado${total !== 1 ? "s" : ""} para "${q}"` : " cadastrado" + (total !== 1 ? "s" : "")}
           </p>
         </div>
         <Link
@@ -32,14 +47,23 @@ export default async function FornecedoresPage() {
         </Link>
       </div>
 
+      {/* Busca */}
+      <Suspense>
+        <SearchInput placeholder="Buscar por nome, e-mail, telefone ou CNPJ…" />
+      </Suspense>
+
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         {!suppliers?.length ? (
           <div className="py-16 flex flex-col items-center gap-2 text-slate-400">
             <Truck size={36} className="text-slate-300" />
-            <p className="text-sm">Nenhum fornecedor cadastrado</p>
-            <Link href="/fornecedores/novo" className="text-sm text-blue-600 hover:text-blue-700 font-medium mt-1">
-              Cadastrar primeiro fornecedor
-            </Link>
+            <p className="text-sm font-medium text-slate-500">
+              {q ? `Nenhum fornecedor encontrado para "${q}"` : "Nenhum fornecedor cadastrado"}
+            </p>
+            {!q && (
+              <Link href="/fornecedores/novo" className="text-sm text-blue-600 hover:text-blue-700 font-medium mt-1">
+                Cadastrar primeiro fornecedor
+              </Link>
+            )}
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -53,7 +77,7 @@ export default async function FornecedoresPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {suppliers.map((s) => (
-                <tr key={s.id} className="hover:bg-slate-50">
+                <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900">{s.name}</p>
                     {s.notes && (
@@ -81,8 +105,12 @@ export default async function FornecedoresPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      <Link href={`/fornecedores/${s.id}/editar`} className="text-slate-400 hover:text-blue-600 transition-colors">
-                        <Pencil size={16} />
+                      <Link
+                        href={`/fornecedores/${s.id}/editar`}
+                        aria-label="Editar fornecedor"
+                        className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded"
+                      >
+                        <Pencil size={15} />
                       </Link>
                       <DeleteSupplierButton id={s.id} name={s.name} />
                     </div>

@@ -1,16 +1,15 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { createSupplierAction } from "../actions";
 import { SupplierForm } from "../supplier-form";
 
 export default function NovoFornecedorPage() {
   return (
     <div className="space-y-6 max-w-2xl">
-      <nav className="flex items-center gap-1 text-sm text-slate-500">
-        <Link href="/fornecedores" className="hover:text-slate-700">Fornecedores</Link>
-        <ChevronRight size={14} />
-        <span className="text-slate-900 font-medium">Novo fornecedor</span>
-      </nav>
+      <Link href="/fornecedores" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+        <ArrowLeft size={15} />
+        Voltar
+      </Link>
 
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Novo fornecedor</h1>

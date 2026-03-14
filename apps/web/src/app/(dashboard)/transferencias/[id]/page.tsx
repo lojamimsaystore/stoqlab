@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
@@ -29,11 +29,10 @@ export default async function TransferenciaDetailPage({ params }: { params: { id
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <nav className="flex items-center gap-1 text-sm text-slate-500">
-        <Link href="/transferencias" className="hover:text-slate-700">Transferências</Link>
-        <ChevronRight size={14} />
-        <span className="text-slate-900 font-medium">{formatDate(transfer.requested_at)}</span>
-      </nav>
+      <Link href="/transferencias" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+        <ArrowLeft size={15} />
+        Voltar
+      </Link>
 
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
         <div className="flex items-center gap-3 text-lg font-semibold text-slate-900">

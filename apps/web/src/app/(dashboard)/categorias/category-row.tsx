@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Pencil, Trash2, Check, X } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Check, X } from "lucide-react";
+import { toast } from "sonner";
 import { updateCategoryAction, deleteCategoryAction } from "./actions";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 
 export function CategoryRow({
   id,
@@ -16,56 +18,79 @@ export function CategoryRow({
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(name);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
-  async function handleSave() {
+  function handleSave() {
     if (value.trim() === name) { setEditing(false); return; }
-    setLoading(true);
-    const res = await updateCategoryAction(id, value.trim());
-    setLoading(false);
-    if (res.error) { setError(res.error); return; }
-    setEditing(false);
-    setError("");
-  }
-
-  async function handleDelete() {
-    if (!confirm(`Remover categoria "${name}"?`)) return;
-    await deleteCategoryAction(id);
+    startTransition(async () => {
+      const res = await updateCategoryAction(id, value.trim());
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      toast.success(`Categoria renomeada para "${value.trim()}"`);
+      setEditing(false);
+      setError("");
+    });
   }
 
   return (
-    <tr className="border-b border-slate-100 hover:bg-slate-50">
-      <td className="px-4 py-3">
+    <tr className="hover:bg-slate-50">
+      <td className="px-5 py-3">
         {editing ? (
           <div className="flex items-center gap-2">
             <input
               autoFocus
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") setEditing(false); }}
-              className="px-2 py-1 border border-blue-400 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSave();
+                if (e.key === "Escape") { setEditing(false); setValue(name); setError(""); }
+              }}
+              className="flex-1 px-3 py-1.5 border border-blue-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <button onClick={handleSave} disabled={loading} className="text-emerald-600 hover:text-emerald-700">
+            <button
+              onClick={handleSave}
+              disabled={isPending}
+              className="text-emerald-600 hover:text-emerald-700 transition p-1"
+              title="Salvar"
+              aria-label="Salvar nome"
+            >
               <Check size={16} />
             </button>
-            <button onClick={() => { setEditing(false); setValue(name); setError(""); }} className="text-slate-400 hover:text-slate-600">
+            <button
+              onClick={() => { setEditing(false); setValue(name); setError(""); }}
+              className="text-slate-400 hover:text-slate-600 transition p-1"
+              title="Cancelar"
+              aria-label="Cancelar edição"
+            >
               <X size={16} />
             </button>
           </div>
         ) : (
-          <span className="text-slate-900 font-medium">{name}</span>
+          <span className="font-medium text-slate-900">{name}</span>
         )}
         {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
       </td>
-      <td className="px-4 py-3 text-slate-500 text-sm">{productCount} produto(s)</td>
-      <td className="px-4 py-3 text-right">
-        <div className="flex items-center justify-end gap-2">
-          <button onClick={() => setEditing(true)} className="text-slate-400 hover:text-blue-600">
-            <Pencil size={15} />
+      <td className="px-5 py-3 text-slate-500 text-sm">
+        {productCount} produto{productCount !== 1 ? "s" : ""}
+      </td>
+      <td className="px-5 py-3 text-right">
+        <div className="flex items-center justify-end gap-3">
+          <button
+            onClick={() => setEditing(true)}
+            className="text-xs text-slate-500 hover:text-blue-600 font-medium transition"
+          >
+            Editar
           </button>
-          <button onClick={handleDelete} className="text-slate-400 hover:text-red-600">
-            <Trash2 size={15} />
-          </button>
+          <ConfirmDeleteDialog
+            itemName={name}
+            title="Remover categoria?"
+            description={`A categoria "${name}" será removida. Os produtos vinculados a ela ficarão sem categoria.`}
+            successMessage={`Categoria "${name}" removida com sucesso`}
+            onConfirm={() => deleteCategoryAction(id)}
+            iconSize={14}
+          />
         </div>
       </td>
     </tr>

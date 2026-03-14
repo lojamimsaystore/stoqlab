@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
@@ -30,11 +30,10 @@ export default async function VendaDetailPage({ params }: { params: { id: string
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <nav className="flex items-center gap-1 text-sm text-slate-500">
-        <Link href="/vendas" className="hover:text-slate-700">Vendas</Link>
-        <ChevronRight size={14} />
-        <span className="text-slate-900 font-medium">{formatDate(sale.sold_at)}</span>
-      </nav>
+      <Link href="/vendas" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+        <ArrowLeft size={15} />
+        Voltar
+      </Link>
 
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">

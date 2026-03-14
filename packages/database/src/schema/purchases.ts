@@ -10,8 +10,9 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { purchaseStatusEnum } from "./enums";
+import { paymentMethodEnum, purchaseStatusEnum } from "./enums";
 import { locations } from "./locations";
+import { productVariants } from "./product-variants";
 import { suppliers } from "./suppliers";
 import { tenants } from "./tenants";
 import { users } from "./users";
@@ -51,6 +52,7 @@ export const purchases = pgTable(
     }).generatedAlwaysAs(
       sql`CASE WHEN total_items > 0 THEN (products_cost + freight_cost + other_costs) / total_items ELSE 0 END`,
     ),
+    paymentMethod: paymentMethodEnum("payment_method"),
     notes: text("notes"),
     purchasedAt: timestamp("purchased_at", { withTimezone: true })
       .notNull()
@@ -85,7 +87,7 @@ export const purchaseItems = pgTable(
     purchaseId: uuid("purchase_id")
       .notNull()
       .references(() => purchases.id, { onDelete: "cascade" }),
-    variantId: uuid("variant_id").notNull(),
+    variantId: uuid("variant_id").notNull().references(() => productVariants.id, { onDelete: "cascade" }),
     quantity: integer("quantity").notNull(),
     unitCost: numeric("unit_cost", { precision: 10, scale: 4 }).notNull(),
     realUnitCost: numeric("real_unit_cost", { precision: 10, scale: 4 }),

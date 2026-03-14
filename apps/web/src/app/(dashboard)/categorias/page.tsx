@@ -26,44 +26,47 @@ export default async function CategoriasPage() {
     if (p.category_id) countMap[p.category_id] = (countMap[p.category_id] ?? 0) + 1;
   }
 
+  const total = categories?.length ?? 0;
+
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">Categorias</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Organize seus produtos por categoria.
-        </p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">Categorias</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {total} categoria{total !== 1 ? "s" : ""} cadastrada{total !== 1 ? "s" : ""}
+          </p>
+        </div>
       </div>
 
-      {/* Formulário de nova categoria */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
-        <h2 className="text-sm font-semibold text-slate-700 mb-3">Nova categoria</h2>
-        <AddCategoryForm />
-      </div>
-
-      {/* Lista */}
+      {/* Card único: formulário + lista */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+
+        {/* Formulário inline */}
         <div className="px-5 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-900">
-            {categories?.length ?? 0} categoria(s)
-          </h2>
+          <AddCategoryForm />
         </div>
 
+        {/* Estado vazio */}
         {!categories?.length ? (
-          <div className="py-12 flex flex-col items-center gap-2 text-slate-400">
-            <FolderOpen size={32} className="text-slate-300" />
-            <p className="text-sm">Nenhuma categoria cadastrada</p>
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <FolderOpen size={40} className="text-slate-300 mb-4" />
+            <p className="text-slate-600 font-medium">Nenhuma categoria cadastrada</p>
+            <p className="text-slate-400 text-sm mt-1">
+              Crie sua primeira categoria usando o campo acima
+            </p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 text-left border-b border-slate-100">
-                <th className="px-4 py-3 font-medium text-slate-600">Nome</th>
-                <th className="px-4 py-3 font-medium text-slate-600">Produtos</th>
-                <th className="px-4 py-3" />
+                <th className="px-5 py-3 font-medium text-slate-600">Nome</th>
+                <th className="px-5 py-3 font-medium text-slate-600">Produtos</th>
+                <th className="px-5 py-3" />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               {categories.map((c) => (
                 <CategoryRow
                   key={c.id}

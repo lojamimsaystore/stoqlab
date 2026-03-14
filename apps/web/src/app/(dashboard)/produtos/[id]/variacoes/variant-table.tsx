@@ -43,7 +43,7 @@ export function VariantTable({
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
         <p className="text-sm font-medium text-slate-700">
-          {variants.length} variação{variants.length !== 1 ? "ões" : ""} cadastrada{variants.length !== 1 ? "s" : ""}
+          {variants.length} varia{variants.length !== 1 ? "ções" : "ção"} cadastrada{variants.length !== 1 ? "s" : ""}
         </p>
       </div>
       <table className="w-full text-sm">

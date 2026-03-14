@@ -59,14 +59,16 @@ async function uploadPhoto(
 // ─── Gera SKU automático ─────────────────────────────────────
 
 function generateSku(name: string, color: string, size: string): string {
-  const clean = (s: string) =>
+  const clean = (s: string, len: number) =>
     s
       .toUpperCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^A-Z0-9]/g, "")
-      .slice(0, 6);
-  return `${clean(name)}-${clean(color)}-${size}`;
+      .slice(0, len);
+  // Usa suffix aleatório para eliminar colisões quando nome+cor+tamanho são similares
+  const suffix = Math.floor(Math.random() * 900 + 100); // 3 dígitos
+  return `${clean(name, 4)}-${clean(color, 4)}-${size}-${suffix}`;
 }
 
 // ─── Criar produto completo (produto + variação + estoque) ───
@@ -217,45 +219,26 @@ export async function updateProductAction(
 
 export async function deleteProductAction(id: string) {
   const tenantId = await getTenantId();
-  const deletedAt = new Date().toISOString();
 
-  // Soft-delete em cascata: variações primeiro, depois o produto
-  await supabaseAdmin
+  // Buscar IDs das variações para limpar filhos sem cascade
+  const { data: variants } = await supabaseAdmin
     .from("product_variants")
-    .update({ deleted_at: deletedAt })
+    .select("id")
     .eq("product_id", id)
     .eq("tenant_id", tenantId);
 
-  await supabaseAdmin
-    .from("products")
-    .update({ deleted_at: deletedAt })
-    .eq("id", id)
-    .eq("tenant_id", tenantId);
+  const variantIds = variants?.map((v) => v.id) ?? [];
+
+  if (variantIds.length > 0) {
+    // inventory_movements não tem cascade — deletar primeiro
+    await supabaseAdmin.from("inventory_movements").delete().in("variant_id", variantIds);
+    await supabaseAdmin.from("inventory").delete().in("variant_id", variantIds);
+    await supabaseAdmin.from("product_variants").delete().in("id", variantIds);
+  }
+
+  await supabaseAdmin.from("products").delete().eq("id", id).eq("tenant_id", tenantId);
 
   revalidatePath("/produtos");
-  revalidatePath("/estoque");
-}
-
-// Limpa variações órfãs (produto deletado mas variação sem deleted_at)
-export async function cleanOrphanVariantsAction(): Promise<void> {
-  const tenantId = await getTenantId();
-
-  const { data: deletedProducts } = await supabaseAdmin
-    .from("products")
-    .select("id")
-    .eq("tenant_id", tenantId)
-    .not("deleted_at", "is", null);
-
-  if (!deletedProducts?.length) return;
-
-  const ids = deletedProducts.map((p) => p.id);
-
-  await supabaseAdmin
-    .from("product_variants")
-    .update({ deleted_at: new Date().toISOString() })
-    .in("product_id", ids)
-    .is("deleted_at", null);
-
   revalidatePath("/estoque");
 }
 
@@ -326,14 +309,147 @@ export async function createVariantAction(
   return {};
 }
 
+// ─── Upload temporário de foto (antes de criar produto) ──────
+
+export async function uploadTempPhotoAction(formData: FormData): Promise<string | null> {
+  const tenantId = await getTenantId();
+  const photo = formData.get("photo") as File | null;
+  if (!photo || photo.size === 0) return null;
+  try {
+    await supabaseAdmin.storage.createBucket("products", { public: true }).catch(() => {});
+    const ext = photo.name.split(".").pop() ?? "jpg";
+    const path = `${tenantId}/pending/${Date.now()}.${ext}`;
+    const buffer = Buffer.from(await photo.arrayBuffer());
+    const { error } = await supabaseAdmin.storage
+      .from("products")
+      .upload(path, buffer, { contentType: photo.type });
+    if (error) return null;
+    const { data } = supabaseAdmin.storage.from("products").getPublicUrl(path);
+    return data.publicUrl;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Criar produto inline (a partir da tela de compras) ──────
+
+type InlineProduct = { id: string; name: string };
+
+export async function createProductInlineAction(
+  _prev: { error?: string; product?: InlineProduct },
+  formData: FormData,
+): Promise<{ error?: string; product?: InlineProduct }> {
+  const tenantId = await getTenantId();
+
+  const name = (formData.get("name") as string)?.trim().toUpperCase();
+  if (!name) return { error: "Nome obrigatório." };
+
+  // Nome deve ser único
+  const { data: existing } = await supabaseAdmin
+    .from("products")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .ilike("name", name)
+    .is("deleted_at", null)
+    .limit(1)
+    .single();
+
+  if (existing) return { error: `Já existe um produto com o nome "${name}".` };
+
+  const { data: product, error: productError } = await supabaseAdmin
+    .from("products")
+    .insert({ tenant_id: tenantId, name, status: "active" })
+    .select("id")
+    .single();
+
+  if (productError || !product) return { error: "Erro ao criar produto." };
+
+  // Upload de foto
+  const photo = formData.get("photo") as File | null;
+  if (photo && photo.size > 0) {
+    const url = await uploadPhoto(photo, tenantId, product.id);
+    if (url) await supabaseAdmin.from("products").update({ cover_image_url: url }).eq("id", product.id);
+  }
+
+  revalidatePath("/produtos");
+  revalidatePath("/compras/nova");
+
+  return { product: { id: product.id, name } };
+}
+
+// ─── Criar variação inline (a partir da tela de compras) ─────
+
+type InlineVariant = { id: string; color: string; size: string; sku: string };
+
+export async function createVariantInlineAction(
+  _prev: { error?: string; variant?: InlineVariant },
+  formData: FormData,
+): Promise<{ error?: string; variant?: InlineVariant }> {
+  const tenantId = await getTenantId();
+
+  const productId = formData.get("productId") as string;
+  const color = (formData.get("color") as string)?.trim();
+  const size = formData.get("size") as string;
+
+  if (!productId || !color || !size) return { error: "Preencha todos os campos." };
+
+  const { data: product } = await supabaseAdmin
+    .from("products")
+    .select("name")
+    .eq("id", productId)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (!product) return { error: "Produto não encontrado." };
+
+  const sku = generateSku(product.name, color, size);
+
+  const { data: variant, error } = await supabaseAdmin
+    .from("product_variants")
+    .insert({ tenant_id: tenantId, product_id: productId, color, size, sku, min_stock: 0 })
+    .select("id, color, size, sku")
+    .single();
+
+  if (error) return { error: "Essa combinação de cor e tamanho já existe neste produto." };
+
+  revalidatePath("/compras/nova");
+
+  return { variant: { id: variant.id, color: variant.color, size: variant.size, sku: variant.sku } };
+}
+
+// ─── Atualizar preço de venda (uma ou várias variações) ───────
+
+export async function updateVariantsSalePriceAction(
+  variantIds: string[],
+  productId: string,
+  salePrice: number,
+): Promise<{ error?: string }> {
+  const tenantId = await getTenantId();
+
+  const { error } = await supabaseAdmin
+    .from("product_variants")
+    .update({ sale_price: salePrice.toFixed(2) })
+    .in("id", variantIds)
+    .eq("tenant_id", tenantId);
+
+  if (error) return { error: "Erro ao atualizar preço." };
+
+  revalidatePath(`/produtos/${productId}/variacoes`);
+  return {};
+}
+
 // ─── Excluir variação ─────────────────────────────────────────
 
 export async function deleteVariantAction(id: string, productId: string) {
   const tenantId = await getTenantId();
 
+  // inventory_movements não tem cascade — deletar primeiro
+  await supabaseAdmin.from("inventory_movements").delete().eq("variant_id", id);
+  await supabaseAdmin.from("inventory").delete().eq("variant_id", id);
+
   await supabaseAdmin
     .from("product_variants")
-    .update({ deleted_at: new Date().toISOString() })
+    .delete()
     .eq("id", id)
     .eq("tenant_id", tenantId);
 

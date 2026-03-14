@@ -6,6 +6,15 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 
+export type CustomerResult = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  birthdate: string | null;
+  address: string | null;
+};
+
 const itemSchema = z.object({
   variantId: z.string().uuid(),
   quantity: z.number().int().min(1),
@@ -79,12 +88,38 @@ export async function createSaleAction(
     0
   );
 
+  // Resolve cliente (existente ou cria novo)
+  const customerId = (formData.get("customerId") as string) || null;
+  const customerName = ((formData.get("customerName") as string) || "").trim();
+  const customerPhone = ((formData.get("customerPhone") as string) || "").trim() || null;
+  const customerEmail = ((formData.get("customerEmail") as string) || "").trim() || null;
+  const customerBirthdate = ((formData.get("customerBirthdate") as string) || "").trim() || null;
+  const customerAddress = ((formData.get("customerAddress") as string) || "").trim() || null;
+
+  let resolvedCustomerId: string | null = customerId;
+  if (!resolvedCustomerId && customerName) {
+    const { data: newCustomer } = await supabaseAdmin
+      .from("customers")
+      .insert({
+        tenant_id: tenantId,
+        name: customerName,
+        phone: customerPhone,
+        email: customerEmail,
+        birthdate: customerBirthdate,
+        address: customerAddress,
+      })
+      .select("id")
+      .single();
+    if (newCustomer) resolvedCustomerId = newCustomer.id;
+  }
+
   // Cria venda
   const { data: sale, error: saleError } = await supabaseAdmin
     .from("sales")
     .insert({
       tenant_id: tenantId,
       location_id: locationId,
+      customer_id: resolvedCustomerId,
       status: "completed",
       channel: parsed.data.channel,
       payment_method: parsed.data.paymentMethod,
@@ -148,6 +183,20 @@ export async function createSaleAction(
   revalidatePath("/vendas");
   revalidatePath("/estoque");
   redirect("/vendas");
+}
+
+export async function searchCustomersAction(query: string): Promise<CustomerResult[]> {
+  const tenantId = await getTenantId();
+  if (!query || query.length < 2) return [];
+  const { data } = await supabaseAdmin
+    .from("customers")
+    .select("id, name, phone, email, birthdate, address")
+    .eq("tenant_id", tenantId)
+    .is("deleted_at", null)
+    .or(`name.ilike.%${query}%,phone.ilike.%${query}%,email.ilike.%${query}%`)
+    .order("name")
+    .limit(8);
+  return (data ?? []) as CustomerResult[];
 }
 
 export async function cancelSaleAction(id: string): Promise<void> {

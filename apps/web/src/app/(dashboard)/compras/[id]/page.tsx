@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { formatCurrency, formatDate } from "@stoqlab/utils";
+import { UploadInvoiceButton } from "./upload-invoice-button";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "Rascunho",
@@ -24,7 +25,7 @@ export default async function CompraDetailPage({ params }: { params: { id: strin
   const { data: purchase } = await supabaseAdmin
     .from("purchases")
     .select(`
-      id, status, invoice_number, purchased_at, received_at,
+      id, status, invoice_number, invoice_url, purchased_at, received_at,
       products_cost, freight_cost, other_costs, total_items, notes,
       suppliers(name, phone, email)
     `)
@@ -37,21 +38,18 @@ export default async function CompraDetailPage({ params }: { params: { id: strin
 
   const { data: items } = await supabaseAdmin
     .from("purchase_items")
-    .select("id, quantity, unit_cost, real_unit_cost, product_variants(color, size, sku, products(name))")
+    .select("id, quantity, unit_cost, real_unit_cost, product_variants(color, size, sku, products(name, categories(name)))")
     .eq("purchase_id", params.id);
 
   const total = Number(purchase.products_cost) + Number(purchase.freight_cost) + Number(purchase.other_costs);
   const supplier = purchase.suppliers as { name: string; phone?: string; email?: string } | null;
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <nav className="flex items-center gap-1 text-sm text-slate-500">
-        <Link href="/compras" className="hover:text-slate-700">Compras</Link>
-        <ChevronRight size={14} />
-        <span className="text-slate-900 font-medium">
-          {purchase.invoice_number ?? formatDate(purchase.purchased_at)}
-        </span>
-      </nav>
+    <div className="space-y-6">
+      <Link href="/compras" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+        <ArrowLeft size={15} />
+        Voltar
+      </Link>
 
       {/* Cabeçalho */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
@@ -62,9 +60,22 @@ export default async function CompraDetailPage({ params }: { params: { id: strin
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">{formatDate(purchase.purchased_at)}</p>
           </div>
-          <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLOR[purchase.status] ?? ""}`}>
-            {STATUS_LABEL[purchase.status]}
-          </span>
+          <div className="flex items-center gap-3 shrink-0">
+            <UploadInvoiceButton purchaseId={purchase.id} hasInvoice={!!purchase.invoice_url} />
+            {purchase.invoice_url && (
+              <a
+                href={purchase.invoice_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                Ver NF
+              </a>
+            )}
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLOR[purchase.status] ?? ""}`}>
+              {STATUS_LABEL[purchase.status]}
+            </span>
+          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
@@ -122,12 +133,18 @@ export default async function CompraDetailPage({ params }: { params: { id: strin
           </thead>
           <tbody className="divide-y divide-slate-100">
             {(items ?? []).map((item) => {
-              const variant = item.product_variants as { color: string; size: string; sku: string; products: { name: string } | null } | null;
+              const variant = item.product_variants as { color: string; size: string; sku: string; products: { name: string; categories: { name: string } | null } | null } | null;
+              const category = variant?.products?.categories?.name;
               return (
                 <tr key={item.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900">{variant?.products?.name ?? "—"}</p>
-                    <p className="text-xs text-slate-500">{variant?.color} · {variant?.size} · {variant?.sku}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {category && (
+                        <span className="text-[10px] font-medium bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{category}</span>
+                      )}
+                      <p className="text-xs text-slate-500">{variant?.color} · {variant?.size} · {variant?.sku}</p>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-center text-slate-700">{item.quantity}</td>
                   <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(Number(item.unit_cost))}</td>

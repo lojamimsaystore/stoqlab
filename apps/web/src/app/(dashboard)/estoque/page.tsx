@@ -48,7 +48,7 @@ export default async function EstoquePage() {
   }).length;
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Estoque</h1>
         <p className="text-sm text-slate-500 mt-1">

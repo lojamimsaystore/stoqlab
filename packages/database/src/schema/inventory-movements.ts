@@ -22,10 +22,10 @@ export const inventoryMovements = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     variantId: uuid("variant_id")
       .notNull()
-      .references(() => productVariants.id),
-    locationId: uuid("location_id").references(() => locations.id),
-    fromLocationId: uuid("from_location_id").references(() => locations.id),
-    toLocationId: uuid("to_location_id").references(() => locations.id),
+      .references(() => productVariants.id, { onDelete: "cascade" }),
+    locationId: uuid("location_id").references(() => locations.id, { onDelete: "set null" }),
+    fromLocationId: uuid("from_location_id").references(() => locations.id, { onDelete: "set null" }),
+    toLocationId: uuid("to_location_id").references(() => locations.id, { onDelete: "set null" }),
     quantityDelta: integer("quantity_delta").notNull(),
     movementType: movementTypeEnum("movement_type").notNull(),
     referenceType: varchar("reference_type", { length: 40 }),

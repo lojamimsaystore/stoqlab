@@ -25,11 +25,18 @@ export default async function DashboardLayout({
   if (profile?.role === "master") redirect("/admin");
 
   const userName = profile?.name ?? "Usuário";
-  const tenantName =
-    (profile?.tenants as { name: string } | null)?.name ?? "Minha Loja";
+  const userRole = profile?.role ?? "owner";
+  const userEmail = user.email ?? "";
+  const tenants = profile?.tenants as unknown as Array<{ name: string }> | null | undefined;
+  const tenantName = Array.isArray(tenants) ? (tenants[0]?.name ?? "Minha Loja") : "Minha Loja";
 
   return (
-    <DashboardShell tenantName={tenantName} userName={userName}>
+    <DashboardShell
+      tenantName={tenantName}
+      userName={userName}
+      userRole={userRole}
+      userEmail={userEmail}
+    >
       {children}
     </DashboardShell>
   );

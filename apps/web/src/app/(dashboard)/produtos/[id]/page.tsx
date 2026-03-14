@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Plus, Package } from "lucide-react";
+import { ArrowLeft, Plus, Package } from "lucide-react";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
@@ -60,12 +60,10 @@ export default async function ProdutoPage({
 
   return (
     <div className="space-y-6 max-w-3xl">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-1 text-sm text-slate-500">
-        <Link href="/produtos" className="hover:text-slate-700">Produtos</Link>
-        <ChevronRight size={14} />
-        <span className="text-slate-900 font-medium">{product.name}</span>
-      </nav>
+      <Link href="/produtos" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+        <ArrowLeft size={15} />
+        Voltar
+      </Link>
 
       {/* Header do produto */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">

@@ -77,7 +77,7 @@ export async function deleteCustomerAction(id: string): Promise<void> {
   const tenantId = await getTenantId();
   await supabaseAdmin
     .from("customers")
-    .update({ deleted_at: new Date().toISOString() })
+    .delete()
     .eq("id", id)
     .eq("tenant_id", tenantId);
 

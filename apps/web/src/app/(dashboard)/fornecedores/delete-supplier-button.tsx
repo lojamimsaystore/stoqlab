@@ -1,21 +1,19 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { deleteSupplierAction } from "./actions";
 
 export function DeleteSupplierButton({ id, name }: { id: string; name: string }) {
   const router = useRouter();
-
-  async function handle() {
-    if (!confirm(`Remover fornecedor "${name}"?`)) return;
-    await deleteSupplierAction(id);
-    router.refresh();
-  }
-
   return (
-    <button onClick={handle} className="text-slate-400 hover:text-red-600 transition-colors">
-      <Trash2 size={16} />
-    </button>
+    <ConfirmDeleteDialog
+      itemName={name}
+      title="Remover fornecedor?"
+      description={`O fornecedor "${name}" será removido permanentemente. Esta ação não pode ser desfeita.`}
+      successMessage={`Fornecedor "${name}" removido com sucesso`}
+      onConfirm={() => deleteSupplierAction(id)}
+      onSuccess={() => router.refresh()}
+    />
   );
 }

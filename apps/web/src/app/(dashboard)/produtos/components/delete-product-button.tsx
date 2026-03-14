@@ -1,26 +1,20 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { deleteProductAction } from "../actions";
 
-export function DeleteProductButton({
-  id,
-  name,
-}: {
-  id: string;
-  name: string;
-}) {
-  async function handleDelete() {
-    if (!confirm(`Excluir "${name}"? Esta ação não pode ser desfeita.`)) return;
-    await deleteProductAction(id);
-  }
-
+export function DeleteProductButton({ id, name }: { id: string; name: string }) {
+  const router = useRouter();
   return (
-    <button
-      onClick={handleDelete}
-      className="text-xs text-red-500 hover:underline font-medium"
-    >
-      <Trash2 size={14} />
-    </button>
+    <ConfirmDeleteDialog
+      itemName={name}
+      title="Excluir produto?"
+      description={`O produto "${name}" e todas as suas variações serão removidos. Esta ação não pode ser desfeita.`}
+      successMessage={`Produto "${name}" removido com sucesso`}
+      onConfirm={() => deleteProductAction(id)}
+      onSuccess={() => router.refresh()}
+      iconSize={14}
+    />
   );
 }

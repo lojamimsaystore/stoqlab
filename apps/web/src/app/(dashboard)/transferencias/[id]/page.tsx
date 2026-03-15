@@ -24,8 +24,8 @@ export default async function TransferenciaDetailPage({ params }: { params: { id
     .select("id, quantity, product_variants(color, size, sku, products(name))")
     .eq("transfer_id", params.id);
 
-  const from = transfer.from_location as { name: string } | null;
-  const to = transfer.to_location as { name: string } | null;
+  const from = transfer.from_location as unknown as { name: string } | null;
+  const to = transfer.to_location as unknown as { name: string } | null;
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -61,7 +61,7 @@ export default async function TransferenciaDetailPage({ params }: { params: { id
           </thead>
           <tbody className="divide-y divide-slate-100">
             {(items ?? []).map((item) => {
-              const v = item.product_variants as { color: string; size: string; sku: string; products: { name: string } | null } | null;
+              const v = item.product_variants as unknown as { color: string; size: string; sku: string; products: { name: string } | null } | null;
               return (
                 <tr key={item.id}>
                   <td className="px-4 py-3 font-medium text-slate-900">{v?.products?.name ?? "—"}</td>

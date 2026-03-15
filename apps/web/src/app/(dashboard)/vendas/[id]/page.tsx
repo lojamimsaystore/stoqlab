@@ -48,11 +48,11 @@ export default async function VendaDetailPage({
     .select("id, quantity, sale_price, discount, final_price, product_variants(color, size, sku, products(name))")
     .eq("sale_id", params.id);
 
-  const location = sale.locations as { name: string } | null;
-  const customer = sale.customers as { name: string } | null;
+  const location = sale.locations as unknown as { name: string } | null;
+  const customer = sale.customers as unknown as { name: string } | null;
 
   const receiptItems = (items ?? []).map((item) => {
-    const v = item.product_variants as { color: string; size: string; products: { name: string } | null } | null;
+    const v = item.product_variants as unknown as { color: string; size: string; products: { name: string } | null } | null;
     return {
       productName: v?.products?.name ?? "—",
       color: v?.color ?? "",
@@ -116,7 +116,7 @@ export default async function VendaDetailPage({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {(items ?? []).map((item) => {
-              const v = item.product_variants as { color: string; size: string; sku: string; products: { name: string } | null } | null;
+              const v = item.product_variants as unknown as { color: string; size: string; sku: string; products: { name: string } | null } | null;
               return (
                 <tr key={item.id}>
                   <td className="px-4 py-3">

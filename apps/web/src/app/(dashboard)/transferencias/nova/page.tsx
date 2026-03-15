@@ -29,12 +29,12 @@ export default async function NovaTransferenciaPage() {
   };
   const productsMap = new Map<string, ProductMap>();
   for (const v of inventoryRows ?? []) {
-    const product = v.products as { id: string; name: string; cover_image_url: string | null } | null;
+    const product = v.products as unknown as { id: string; name: string; cover_image_url: string | null } | null;
     if (!product) continue;
     if (!productsMap.has(product.id)) {
       productsMap.set(product.id, { id: product.id, name: product.name, imageUrl: product.cover_image_url, variants: [] });
     }
-    const invList = v.inventory as { quantity: number; location_id: string }[];
+    const invList = v.inventory as unknown as { quantity: number; location_id: string }[];
     const stock: Record<string, number> = {};
     for (const inv of invList ?? []) stock[inv.location_id] = inv.quantity;
     productsMap.get(product.id)!.variants.push({

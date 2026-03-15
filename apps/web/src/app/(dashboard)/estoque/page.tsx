@@ -29,8 +29,8 @@ export default async function EstoquePage() {
 
   // Expande cada variação por localização com estoque
   const tableRows = (variants ?? []).flatMap((v) => {
-    const product = v.products as { name: string; deleted_at: string | null; categories: { name: string } | null } | null;
-    const invList = v.inventory as { id: string; quantity: number; location_id: string; locations: { name: string } | null }[] | null;
+    const product = v.products as unknown as { name: string; deleted_at: string | null; categories: { name: string } | null } | null;
+    const invList = v.inventory as unknown as { id: string; quantity: number; location_id: string; locations: { name: string } | null }[] | null;
 
     // Ignora variações cujo produto foi deletado (órfãos)
     if (product?.deleted_at) return [];
@@ -53,7 +53,7 @@ export default async function EstoquePage() {
 
   // Conta órfãos para exibir alerta
   const orphanCount = (variants ?? []).filter((v) => {
-    const p = v.products as { deleted_at: string | null } | null;
+    const p = v.products as unknown as { deleted_at: string | null } | null;
     return !!p?.deleted_at;
   }).length;
 

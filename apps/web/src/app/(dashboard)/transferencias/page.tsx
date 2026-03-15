@@ -85,8 +85,8 @@ export default async function TransferenciasPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {transfers.map((t) => {
-                const from = t.from_location as { name: string } | null;
-                const to = t.to_location as { name: string } | null;
+                const from = t.from_location as unknown as { name: string } | null;
+                const to = t.to_location as unknown as { name: string } | null;
                 return (
                   <tr key={t.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 text-slate-700">{formatDate(t.requested_at)}</td>

@@ -94,8 +94,8 @@ export default async function ProdutoPage({
               <p className="text-sm text-slate-500 mt-1">{product.description}</p>
             )}
             <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
-              {(product.categories as { name: string } | null)?.name && (
-                <span>📂 {(product.categories as { name: string }).name}</span>
+              {(product.categories as unknown as { name: string } | null)?.name && (
+                <span>📂 {(product.categories as unknown as { name: string }).name}</span>
               )}
               <span>🧺 {totalQty} em estoque</span>
               <span>{variants?.length ?? 0} variação(ões)</span>

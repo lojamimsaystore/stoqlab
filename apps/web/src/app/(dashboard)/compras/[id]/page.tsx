@@ -135,7 +135,7 @@ export default async function CompraDetailPage({ params }: { params: { id: strin
           </thead>
           <tbody className="divide-y divide-slate-100">
             {(items ?? []).map((item) => {
-              const variant = item.product_variants as { color: string; size: string; sku: string; products: { name: string; categories: { name: string } | null } | null } | null;
+              const variant = item.product_variants as unknown as { color: string; size: string; sku: string; products: { name: string; categories: { name: string } | null } | null } | null;
               const category = variant?.products?.categories?.name;
               return (
                 <tr key={item.id} className="hover:bg-slate-50">

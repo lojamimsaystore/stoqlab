@@ -33,7 +33,7 @@ export default async function NovaCompraPage() {
   const productMap = new Map<string, ProductGroup>();
 
   for (const v of variants ?? []) {
-    const product = v.products as { id: string; name: string; cover_image_url?: string | null; category_id?: string | null } | null;
+    const product = v.products as unknown as { id: string; name: string; cover_image_url?: string | null; category_id?: string | null } | null;
     if (!product) continue;
     if (!productMap.has(product.id)) {
       productMap.set(product.id, { id: product.id, name: product.name, imageUrl: product.cover_image_url, categoryId: product.category_id, variants: [] });

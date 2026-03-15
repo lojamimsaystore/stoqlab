@@ -143,7 +143,7 @@ export default async function VendasPage({
             <tbody className="divide-y divide-slate-100">
               {filtered.map((s) => {
                 const customer = (s.customers as unknown as Array<{ name: string }> | null)?.[0] ?? null;
-                const location = s.locations as { name: string } | null;
+                const location = s.locations as unknown as { name: string } | null;
                 const installmentLabel = parseInstallments(s.notes ?? null);
                 return (
                 <tr key={s.id} className="hover:bg-slate-50 transition-colors">

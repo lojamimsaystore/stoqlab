@@ -58,7 +58,7 @@ export default async function RelatoriosPage() {
 
   // Filtra inventário órfão (variação ou produto deletado)
   const activeInventory = (inventory ?? []).filter((i) => {
-    const v = i.product_variants as { deleted_at: string | null; products: { deleted_at: string | null } | null } | null;
+    const v = i.product_variants as unknown as { deleted_at: string | null; products: { deleted_at: string | null } | null } | null;
     return !v?.deleted_at && !v?.products?.deleted_at;
   });
 
@@ -84,7 +84,7 @@ export default async function RelatoriosPage() {
   // Top 10 produtos mais vendidos
   const productSales = new Map<string, { name: string; qty: number; revenue: number }>();
   for (const item of saleItems ?? []) {
-    const v = item.product_variants as { color: string; size: string; products: { name: string } | null } | null;
+    const v = item.product_variants as unknown as { color: string; size: string; products: { name: string } | null } | null;
     const name = v?.products?.name ?? "—";
     const key = name;
     const cur = productSales.get(key) ?? { name, qty: 0, revenue: 0 };
@@ -97,7 +97,7 @@ export default async function RelatoriosPage() {
   // Estoque por categoria (apenas ativos)
   const catStock = new Map<string, number>();
   for (const inv of activeInventory) {
-    const v = inv.product_variants as { products: { deleted_at: string | null; categories: { name: string } | null } | null } | null;
+    const v = inv.product_variants as unknown as { products: { deleted_at: string | null; categories: { name: string } | null } | null } | null;
     const cat = v?.products?.categories?.name ?? "Sem categoria";
     catStock.set(cat, (catStock.get(cat) ?? 0) + inv.quantity);
   }

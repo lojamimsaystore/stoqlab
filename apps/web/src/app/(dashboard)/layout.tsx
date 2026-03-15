@@ -68,8 +68,8 @@ export default async function DashboardLayout({
       .filter((row) => row.quantity <= lowStockThreshold)
       .slice(0, 15)
       .map((row) => {
-        const variant = row.product_variants as { color: string; size: string; products: { name: string } | null } | null;
-        const location = row.locations as { name: string } | null;
+        const variant = row.product_variants as unknown as { color: string; size: string; products: { name: string } | null } | null;
+        const location = row.locations as unknown as { name: string } | null;
         return {
           id: row.id,
           quantity: row.quantity,

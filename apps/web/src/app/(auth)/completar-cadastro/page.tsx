@@ -25,15 +25,16 @@ export default function CompletarCadastroPage() {
   const router = useRouter();
   const [state, formAction] = useFormState(completarCadastroAction, {});
   const [nome, setNome] = useState("");
+  const [email, setEmail] = useState("");
   const [loadingUser, setLoadingUser] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { router.push("/login"); return; }
-      // Pré-preenche o nome com o do Google
       const googleName = user.user_metadata?.full_name ?? user.user_metadata?.name ?? "";
       setNome(googleName);
+      setEmail(user.email ?? "");
       setLoadingUser(false);
     });
   }, [router]);
@@ -70,6 +71,19 @@ export default function CompletarCadastroPage() {
       </div>
 
       <form action={formAction} className="space-y-4">
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1.5">
+            E-mail
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            readOnly
+            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
+          />
+        </div>
+
         <div>
           <label htmlFor="nome" className="block text-sm font-medium text-slate-700 mb-1.5">
             Seu nome

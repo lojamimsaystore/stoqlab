@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { formatDate } from "@stoqlab/utils";
+import { DeleteTransferButton } from "./delete-transfer-button";
 
 export default async function TransferenciaDetailPage({ params }: { params: { id: string } }) {
   const tenantId = await getTenantId();
@@ -29,10 +30,13 @@ export default async function TransferenciaDetailPage({ params }: { params: { id
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <Link href="/transferencias" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
-        <ArrowLeft size={15} />
-        Voltar
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href="/transferencias" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+          <ArrowLeft size={15} />
+          Voltar
+        </Link>
+        <DeleteTransferButton transferId={transfer.id} />
+      </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
         <div className="flex items-center gap-3 text-lg font-semibold text-slate-900">

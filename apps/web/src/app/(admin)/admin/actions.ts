@@ -57,6 +57,20 @@ export async function deleteTenantAction(
     return { error: e instanceof Error ? e.message : "Erro" };
   }
 
+  // 1. Busca todos os usuários do tenant antes de deletar
+  const { data: tenantUsers } = await supabaseAdmin
+    .from("users")
+    .select("id")
+    .eq("tenant_id", tenantId);
+
+  // 2. Deleta cada usuário do auth.users (permite re-cadastro pelo mesmo email/Google)
+  if (tenantUsers && tenantUsers.length > 0) {
+    for (const u of tenantUsers) {
+      await supabaseAdmin.auth.admin.deleteUser(u.id);
+    }
+  }
+
+  // 3. Soft delete no tenant (public.users são deletados em cascata ou pelo trigger)
   const { error } = await supabaseAdmin
     .from("tenants")
     .update({ deleted_at: new Date().toISOString() })

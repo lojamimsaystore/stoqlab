@@ -92,7 +92,7 @@ export default async function AdminPage() {
             { id: "trial", label: "Free Trial", color: "bg-slate-100 text-slate-700" },
             { id: "starter", label: "Starter", color: "bg-blue-100 text-blue-700" },
             { id: "pro", label: "Pro", color: "bg-indigo-100 text-indigo-700" },
-            { id: "enterprise", label: "Enterprise", color: "bg-amber-100 text-amber-700" },
+            { id: "enterprise", label: "Empresa (Stoqlab)", color: "bg-amber-100 text-amber-700" },
             { id: "vitalicio", label: "Vitalício", color: "bg-violet-100 text-violet-700" },
           ].map((p) => (
             <div key={p.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${p.color}`}>

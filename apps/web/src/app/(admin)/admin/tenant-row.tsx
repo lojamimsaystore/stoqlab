@@ -21,7 +21,7 @@ const PLAN_LABELS: Record<string, string> = {
   trial: "Free Trial",
   starter: "Starter",
   pro: "Pro",
-  enterprise: "Enterprise",
+  enterprise: "Empresa (Stoqlab)",
   vitalicio: "Vitalício",
 };
 
@@ -144,7 +144,7 @@ export function TenantRow({ tenant }: { tenant: Tenant }) {
           <option value="trial">Free Trial</option>
           <option value="starter">Starter</option>
           <option value="pro">Pro</option>
-          <option value="enterprise">Enterprise</option>
+          <option value="enterprise">Empresa (Stoqlab)</option>
           <option value="vitalicio">Vitalício</option>
         </select>
       </td>

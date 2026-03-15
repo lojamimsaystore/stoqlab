@@ -128,7 +128,11 @@ export function TabLocalizacoes({ locations }: {
 
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Remover localização "${name}"?`)) return;
-    await deleteLocationAction(id);
+    const result = await deleteLocationAction(id);
+    if (result.error) {
+      alert(result.error);
+      return;
+    }
     router.refresh();
   }
 

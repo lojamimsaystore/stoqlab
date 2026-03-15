@@ -152,6 +152,72 @@ export async function createTransferAction(
   redirect("/transferencias");
 }
 
+export async function deleteTransferAction(
+  transferId: string
+): Promise<{ error?: string }> {
+  const tenantId = await getTenantId();
+
+  // Verifica que a transferência pertence ao tenant
+  const { data: transfer } = await supabaseAdmin
+    .from("stock_transfers")
+    .select("id, from_location_id, to_location_id, status")
+    .eq("id", transferId)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (!transfer) return { error: "Transferência não encontrada." };
+
+  // Busca os itens para reverter o estoque
+  const { data: items } = await supabaseAdmin
+    .from("transfer_items")
+    .select("variant_id, quantity")
+    .eq("transfer_id", transferId);
+
+  // Reverte estoque apenas se foi recebida (afetou o estoque)
+  if (transfer.status === "received" && items?.length) {
+    for (const item of items) {
+      // Devolve à origem
+      const { data: fromInv } = await supabaseAdmin
+        .from("inventory")
+        .select("id, quantity")
+        .eq("variant_id", item.variant_id)
+        .eq("location_id", transfer.from_location_id)
+        .single();
+
+      if (fromInv) {
+        await supabaseAdmin
+          .from("inventory")
+          .update({ quantity: fromInv.quantity + item.quantity })
+          .eq("id", fromInv.id);
+      }
+
+      // Subtrai do destino
+      const { data: toInv } = await supabaseAdmin
+        .from("inventory")
+        .select("id, quantity")
+        .eq("variant_id", item.variant_id)
+        .eq("location_id", transfer.to_location_id)
+        .single();
+
+      if (toInv) {
+        await supabaseAdmin
+          .from("inventory")
+          .update({ quantity: Math.max(0, toInv.quantity - item.quantity) })
+          .eq("id", toInv.id);
+      }
+    }
+  }
+
+  // Remove movimentos de estoque, itens e transferência
+  await supabaseAdmin.from("inventory_movements").delete().eq("reference_id", transferId);
+  await supabaseAdmin.from("transfer_items").delete().eq("transfer_id", transferId);
+  await supabaseAdmin.from("stock_transfers").delete().eq("id", transferId);
+
+  revalidatePath("/transferencias");
+  revalidatePath("/estoque");
+  return {};
+}
+
 export async function createLocationAction(
   _prev: { error?: string },
   formData: FormData

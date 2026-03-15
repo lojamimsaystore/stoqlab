@@ -168,16 +168,32 @@ export async function updateLocationAction(
   return {};
 }
 
-export async function deleteLocationAction(id: string): Promise<void> {
+export async function deleteLocationAction(id: string): Promise<{ error?: string }> {
   const tenantId = await getTenantId();
-  await supabaseAdmin
+
+  // Verifica se há estoque vinculado a esta localização
+  const { data: inventoryItems } = await supabaseAdmin
+    .from("inventory")
+    .select("id, quantity")
+    .eq("location_id", id)
+    .gt("quantity", 0)
+    .limit(1);
+
+  if (inventoryItems && inventoryItems.length > 0) {
+    return { error: "Esta localização possui estoque. Transfira ou zere o estoque antes de excluir." };
+  }
+
+  const { error } = await supabaseAdmin
     .from("locations")
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
     .eq("tenant_id", tenantId);
 
+  if (error) return { error: "Erro ao remover localização." };
+
   revalidatePath("/configuracoes");
   revalidatePath("/transferencias");
+  return {};
 }
 
 // ─── Usuários ─────────────────────────────────────────────────

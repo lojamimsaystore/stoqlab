@@ -281,7 +281,6 @@ export function ProductCatalogModal({ variants, cartVariantIds, onSelect, onClos
             {/* Por cor */}
             {Array.from(variantsByColor.entries()).map(([color, colorVariants]) => {
               const hex = resolveColor(colorVariants[0].colorHex, color);
-              const isLight = hex === "#FFFFFF" || hex === "#F5F0E8" || hex === "#E8C9A0" || hex === "#FDD835";
 
               return (
                 <div key={color}>

@@ -50,8 +50,8 @@ export function DashboardShell({
   // Route guard: redirect to dashboard if current module is not allowed
   useEffect(() => {
     if (userRole === "owner" || userRole === "master") return;
-    const module = moduleFromPath(pathname);
-    if (module && !userPermissions.includes(module)) {
+    const currentModule = moduleFromPath(pathname);
+    if (currentModule && !userPermissions.includes(currentModule)) {
       router.replace("/");
     }
   }, [pathname, userPermissions, userRole, router]);

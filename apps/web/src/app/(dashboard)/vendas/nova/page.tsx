@@ -27,7 +27,7 @@ export default async function NovaVendaPage() {
 
   const variants = (variantRows ?? [])
     .map((v) => {
-      const product = v.products as {
+      const product = v.products as unknown as {
         name: string;
         deleted_at: string | null;
         cover_image_url: string | null;
@@ -54,7 +54,7 @@ export default async function NovaVendaPage() {
         coverImageUrl: product.cover_image_url,
       };
     })
-    .filter(Boolean) as {
+    .filter(Boolean) as unknown as {
       id: string;
       color: string;
       colorHex: string | null;

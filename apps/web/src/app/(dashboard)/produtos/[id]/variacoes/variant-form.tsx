@@ -20,12 +20,12 @@ function SubmitButton() {
 
 export function VariantForm({
   productId,
-  productName: _productName,
+  productName,
 }: {
   productId: string;
   productName: string;
 }) {
-  const action = createVariantAction.bind(null, productId);
+  const action = createVariantAction.bind(null, productId, productName);
   const [formState, boundAction] = useFormState(action, {});
 
   return (

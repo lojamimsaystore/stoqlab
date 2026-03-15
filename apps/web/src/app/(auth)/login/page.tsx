@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { loginAction } from "./actions";
+import { GoogleButton } from "@/components/auth/google-button";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -42,6 +43,16 @@ export default function LoginPage() {
         </div>
         <h1 className="text-xl font-bold text-slate-900">Stoqlab</h1>
         <p className="text-sm text-slate-500 mt-0.5">Entre na sua conta para continuar</p>
+      </div>
+
+      {/* Login com Google */}
+      <div className="mb-5">
+        <GoogleButton next="/" />
+        <div className="flex items-center gap-3 mt-4">
+          <div className="flex-1 h-px bg-slate-200" />
+          <span className="text-xs text-slate-400">ou entre com e-mail</span>
+          <div className="flex-1 h-px bg-slate-200" />
+        </div>
       </div>
 
       <form action={action} className="space-y-4">

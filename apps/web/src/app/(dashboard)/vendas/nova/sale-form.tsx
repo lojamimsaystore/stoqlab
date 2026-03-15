@@ -6,11 +6,13 @@ import Link from "next/link";
 import {
   Search, Trash2, ShoppingBag, ArrowLeft, Package,
   Plus, Minus, ChevronRight, Loader2, AlertCircle, Tag,
-  User, UserCheck, X,
+  User, UserCheck, X, LayoutGrid, UserPlus, Pencil,
 } from "lucide-react";
 import { createSaleAction, searchCustomersAction, type CustomerResult } from "../actions";
 import { formatCurrency } from "@stoqlab/utils";
 import { toast } from "sonner";
+import { ProductCatalogModal } from "./product-catalog-modal";
+import { NewCustomerModal, type NewCustomerData } from "./new-customer-modal";
 
 type Variant = {
   id: string;
@@ -19,9 +21,15 @@ type Variant = {
   size: string;
   sku: string;
   salePrice: number;
-  stock: number;
+  locationStock: Record<string, number>;
   productName: string;
   coverImageUrl: string | null;
+};
+
+type Location = {
+  id: string;
+  name: string;
+  type: string;
 };
 
 type Item = {
@@ -37,11 +45,10 @@ type Item = {
 };
 
 const PAYMENT_OPTIONS = [
-  { value: "cash",        label: "Dinheiro",  emoji: "💵" },
-  { value: "pix",         label: "Pix",       emoji: "⚡" },
-  { value: "debit",       label: "Débito",    emoji: "💳" },
-  { value: "credit",      label: "Crédito",   emoji: "🏦" },
-  { value: "installment", label: "Parcelado", emoji: "📅" },
+  { value: "cash",   label: "Dinheiro", emoji: "💵" },
+  { value: "pix",    label: "Pix",      emoji: "⚡" },
+  { value: "debit",  label: "Débito",   emoji: "💳" },
+  { value: "credit", label: "Crédito",  emoji: "🏦" },
 ];
 
 const CHANNEL_OPTIONS = [
@@ -79,27 +86,30 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
   );
 }
 
-export function SaleForm({ variants }: { variants: Variant[] }) {
+export function SaleForm({ variants, locations }: { variants: Variant[]; locations: Location[] }) {
   const [state, formAction] = useFormState(createSaleAction, {});
   const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState("");
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("pix");
   const [showSearch, setShowSearch] = useState(false);
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [selectedLocationId, setSelectedLocationId] = useState(locations[0]?.id ?? "");
+  const [installments, setInstallments] = useState(1);
+  const [hasInterest, setHasInterest] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Customer
+  // Customer — existing
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerResult | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerResults, setCustomerResults] = useState<CustomerResult[]>([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
-  const [customerBirthdate, setCustomerBirthdate] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
   const customerDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Customer — new (modal)
+  const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
+  const [newCustomer, setNewCustomer] = useState<NewCustomerData | null>(null);
 
   useEffect(() => {
     if (state?.error) toast.error(state.error);
@@ -133,15 +143,16 @@ export function SaleForm({ variants }: { variants: Variant[] }) {
 
   function clearCustomer() {
     setSelectedCustomer(null);
-    setCustomerName("");
-    setCustomerPhone("");
-    setCustomerEmail("");
-    setCustomerBirthdate("");
-    setCustomerAddress("");
+    setNewCustomer(null);
   }
 
+  const locationVariants = variants.map((v) => ({
+    ...v,
+    stock: v.locationStock[selectedLocationId] ?? 0,
+  })).filter((v) => v.stock > 0);
+
   const filtered = search.length > 1
-    ? variants
+    ? locationVariants
         .filter((v) =>
           v.productName.toLowerCase().includes(search.toLowerCase()) ||
           v.sku.toLowerCase().includes(search.toLowerCase()) ||
@@ -151,20 +162,36 @@ export function SaleForm({ variants }: { variants: Variant[] }) {
         .slice(0, 12)
     : [];
 
-  function addItem(v: Variant) {
-    const existing = items.find((i) => i.variantId === v.id);
-    if (existing) {
-      if (existing.quantity >= v.stock) return;
-      setItems(items.map((i) => i.variantId === v.id ? { ...i, quantity: i.quantity + 1 } : i));
-    } else {
-      setItems([...items, {
+  function addItem(v: typeof locationVariants[number]) {
+    setItems((prev) => {
+      const existing = prev.find((i) => i.variantId === v.id);
+      if (existing) {
+        if (existing.quantity >= v.stock) return prev;
+        return prev.map((i) => i.variantId === v.id ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+      return [...prev, {
         variantId: v.id, productName: v.productName, color: v.color,
         colorHex: v.colorHex, size: v.size, coverImageUrl: v.coverImageUrl,
         quantity: 1, salePrice: v.salePrice, stock: v.stock,
-      }]);
-    }
+      }];
+    });
     setSearch("");
     searchRef.current?.focus();
+  }
+
+  function addItemFromCatalog(v: typeof locationVariants[number]) {
+    setItems((prev) => {
+      const existing = prev.find((i) => i.variantId === v.id);
+      if (existing) {
+        if (existing.quantity >= v.stock) return prev;
+        return prev.map((i) => i.variantId === v.id ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+      return [...prev, {
+        variantId: v.id, productName: v.productName, color: v.color,
+        colorHex: v.colorHex, size: v.size, coverImageUrl: v.coverImageUrl,
+        quantity: 1, salePrice: v.salePrice, stock: v.stock,
+      }];
+    });
   }
 
   function changeQty(variantId: string, delta: number) {
@@ -221,7 +248,7 @@ export function SaleForm({ variants }: { variants: Variant[] }) {
           <h1 className="text-sm font-semibold text-slate-900">Nova venda</h1>
         </div>
         <span className="text-xs text-slate-400 hidden sm:block">
-          {variants.length} produto{variants.length !== 1 ? "s" : ""} disponíveis
+          {locationVariants.length} produto{locationVariants.length !== 1 ? "s" : ""} disponíveis
         </span>
       </div>
 
@@ -233,18 +260,29 @@ export function SaleForm({ variants }: { variants: Variant[] }) {
 
           {/* Busca */}
           <div className="p-4 lg:p-5 border-b border-slate-200 bg-white shrink-0 relative z-10">
-            <div className="relative">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input
-                ref={searchRef}
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setShowSearch(true); }}
-                onFocus={() => setShowSearch(true)}
-                onBlur={() => setTimeout(() => setShowSearch(false), 150)}
-                placeholder="Buscar produto por nome, SKU, cor ou tamanho…"
-                autoFocus
-                className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 placeholder:text-slate-400"
-              />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  ref={searchRef}
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); setShowSearch(true); }}
+                  onFocus={() => setShowSearch(true)}
+                  onBlur={() => setTimeout(() => setShowSearch(false), 150)}
+                  placeholder="Buscar produto por nome, SKU, cor ou tamanho…"
+                  autoFocus
+                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 placeholder:text-slate-400"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCatalog(true)}
+                title="Abrir catálogo de produtos"
+                className="flex items-center gap-2 px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-all shrink-0"
+              >
+                <LayoutGrid size={16} />
+                <span className="hidden sm:inline">Catálogo</span>
+              </button>
             </div>
 
             {/* Dropdown */}
@@ -406,80 +444,158 @@ export function SaleForm({ variants }: { variants: Variant[] }) {
         <div className="w-80 xl:w-96 flex flex-col min-h-0 bg-white border-l border-slate-200 shrink-0">
 
           {/* Pagamento */}
-          <div className="p-5 border-b border-slate-100 shrink-0">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Forma de pagamento
+          <div className="px-3 pt-3 pb-2 border-b border-slate-100 shrink-0 space-y-2">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              Pagamento
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-1">
               {PAYMENT_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => setPaymentMethod(opt.value)}
-                  className={`flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-xl border text-xs font-medium transition-all ${
+                  onClick={() => {
+                    setPaymentMethod(opt.value);
+                    if (opt.value !== "credit") {
+                      setInstallments(1);
+                      setHasInterest(false);
+                    }
+                  }}
+                  className={`flex flex-col items-center justify-center gap-1 py-2 rounded-lg border text-[10px] font-medium transition-all ${
                     paymentMethod === opt.value
-                      ? "bg-blue-600 border-blue-600 text-white shadow-sm scale-[1.03]"
-                      : "border-slate-200 text-slate-600 hover:border-blue-200 hover:bg-blue-50"
+                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                      : "border-slate-200 text-slate-500 hover:border-blue-200 hover:bg-blue-50"
                   }`}
                 >
-                  <span className="text-lg leading-none">{opt.emoji}</span>
-                  <span className="leading-tight text-center">{opt.label}</span>
+                  <span className="text-base leading-none">{opt.emoji}</span>
+                  <span className="leading-tight text-center truncate w-full px-0.5">{opt.label}</span>
                 </button>
               ))}
             </div>
             <input type="hidden" name="paymentMethod" value={paymentMethod} />
+
+            {/* Parcelamento — aparece só quando Crédito selecionado */}
+            {paymentMethod === "credit" && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Parcelamento</p>
+                <div className="flex items-center gap-3">
+                  {/* Contador de parcelas */}
+                  <div className="flex items-center gap-1.5">
+                    <button type="button"
+                      onClick={() => setInstallments((p) => Math.max(1, p - 1))}
+                      disabled={installments <= 1}
+                      className="w-6 h-6 rounded-md border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 transition-colors">
+                      <Minus size={11} />
+                    </button>
+                    <span className="w-10 text-center text-sm font-bold text-slate-900 tabular-nums">
+                      {installments}x
+                    </span>
+                    <button type="button"
+                      onClick={() => setInstallments((p) => Math.min(24, p + 1))}
+                      disabled={installments >= 24}
+                      className="w-6 h-6 rounded-md border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 transition-colors">
+                      <Plus size={11} />
+                    </button>
+                  </div>
+
+                  {/* Toggle juros */}
+                  <button type="button"
+                    onClick={() => setHasInterest((p) => !p)}
+                    className={`flex-1 py-1 rounded-lg border text-[11px] font-semibold transition-all ${
+                      hasInterest
+                        ? "bg-red-50 border-red-200 text-red-600"
+                        : "bg-emerald-50 border-emerald-200 text-emerald-600"
+                    }`}>
+                    {hasInterest ? "Com juros" : "Sem juros"}
+                  </button>
+                </div>
+                <input type="hidden" name="installments" value={installments} />
+                <input type="hidden" name="hasInterest" value={hasInterest ? "true" : "false"} />
+              </div>
+            )}
           </div>
 
           {/* Opções */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2.5">
 
             {/* ── Cliente ── */}
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
                 Cliente
               </label>
 
-              {selectedCustomer ? (
+              {selectedCustomer && (
                 <>
                   <input type="hidden" name="customerId" value={selectedCustomer.id} />
-                  <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5">
-                    <UserCheck size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                  <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2">
+                    <UserCheck size={13} className="text-blue-500 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">{selectedCustomer.name}</p>
-                      <p className="text-[11px] text-slate-500 truncate">
+                      <p className="text-xs font-semibold text-slate-800 truncate">{selectedCustomer.name}</p>
+                      <p className="text-[10px] text-slate-500 truncate">
                         {[selectedCustomer.phone, selectedCustomer.email].filter(Boolean).join(" · ") || "Sem contato"}
                       </p>
                     </div>
                     <button type="button" onClick={clearCustomer}
                       className="text-slate-400 hover:text-red-500 transition-colors shrink-0">
-                      <X size={14} />
+                      <X size={13} />
                     </button>
                   </div>
                 </>
-              ) : (
-                <div className="space-y-2">
-                  {/* Busca cliente existente */}
-                  <div className="relative">
-                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              )}
+
+              {!selectedCustomer && newCustomer && (
+                <>
+                  <input type="hidden" name="customerName"      value={newCustomer.name} />
+                  <input type="hidden" name="customerCpf"       value={newCustomer.cpf} />
+                  <input type="hidden" name="customerPhone"     value={newCustomer.phone} />
+                  <input type="hidden" name="customerEmail"     value={newCustomer.email} />
+                  <input type="hidden" name="customerBirthdate" value={newCustomer.birthdate} />
+                  <input type="hidden" name="customerAddress"   value={newCustomer.address} />
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+                    <UserPlus size={13} className="text-amber-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <p className="text-xs font-semibold text-slate-800 truncate">{newCustomer.name}</p>
+                        <span className="text-[9px] font-bold text-amber-600 bg-amber-100 rounded px-1 shrink-0">Novo</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 truncate">
+                        {[newCustomer.phone, newCustomer.email].filter(Boolean).join(" · ") || "Sem contato"}
+                      </p>
+                    </div>
+                    <button type="button" onClick={() => setShowNewCustomerModal(true)}
+                      className="text-slate-400 hover:text-blue-500 transition-colors shrink-0" title="Editar">
+                      <Pencil size={12} />
+                    </button>
+                    <button type="button" onClick={clearCustomer}
+                      className="text-slate-400 hover:text-red-500 transition-colors shrink-0" title="Remover">
+                      <X size={12} />
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {!selectedCustomer && !newCustomer && (
+                <div className="flex gap-1.5">
+                  <div className="relative flex-1">
+                    <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     <input
                       value={customerSearch}
                       onChange={handleCustomerSearch}
                       onFocus={() => customerResults.length > 0 && setShowCustomerDropdown(true)}
                       onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 150)}
-                      placeholder="Buscar cliente existente…"
-                      className="w-full pl-8 pr-8 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300"
+                      placeholder="Buscar cliente…"
+                      className="w-full pl-7 pr-6 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300"
                     />
                     {searchingCustomer && (
-                      <Loader2 size={12} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />
+                      <Loader2 size={11} className="absolute right-2 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />
                     )}
                     {showCustomerDropdown && customerResults.length > 0 && (
                       <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-20 overflow-hidden max-h-44 overflow-y-auto">
                         {customerResults.map((c) => (
                           <button key={c.id} type="button"
                             onMouseDown={() => selectCustomer(c)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-blue-50 text-left border-b border-slate-100 last:border-0 transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-blue-50 text-left border-b border-slate-100 last:border-0 transition-colors"
                           >
-                            <User size={12} className="text-slate-400 shrink-0" />
+                            <User size={11} className="text-slate-400 shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-semibold text-slate-800 truncate">{c.name}</p>
                               <p className="text-[10px] text-slate-400 truncate">{c.phone ?? c.email ?? "—"}</p>
@@ -489,131 +605,114 @@ export function SaleForm({ variants }: { variants: Variant[] }) {
                       </div>
                     )}
                     {showCustomerDropdown && customerResults.length === 0 && !searchingCustomer && customerSearch.length >= 2 && (
-                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-20 px-3 py-3 text-[11px] text-slate-400 text-center">
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-20 px-3 py-2.5 text-[11px] text-slate-400 text-center">
                         Nenhum cliente encontrado
                       </div>
                     )}
                   </div>
-
-                  {/* Divisor */}
-                  <div className="flex items-center gap-2 py-0.5">
-                    <div className="flex-1 h-px bg-slate-100" />
-                    <span className="text-[10px] text-slate-400 shrink-0">ou cadastrar novo</span>
-                    <div className="flex-1 h-px bg-slate-100" />
-                  </div>
-
-                  {/* Campos novo cliente */}
-                  <input
-                    name="customerName"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Nome completo"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      name="customerPhone"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      placeholder="Telefone"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300"
-                    />
-                    <input
-                      name="customerEmail"
-                      type="email"
-                      value={customerEmail}
-                      onChange={(e) => setCustomerEmail(e.target.value)}
-                      placeholder="E-mail"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-400 mb-1 pl-0.5">Data de nascimento</label>
-                    <input
-                      name="customerBirthdate"
-                      type="date"
-                      value={customerBirthdate}
-                      onChange={(e) => setCustomerBirthdate(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <input
-                    name="customerAddress"
-                    value={customerAddress}
-                    onChange={(e) => setCustomerAddress(e.target.value)}
-                    placeholder="Endereço"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewCustomerModal(true)}
+                    title="Cadastrar novo cliente"
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-all shrink-0"
+                  >
+                    <UserPlus size={14} />
+                  </button>
                 </div>
               )}
             </div>
 
-            {/* Separador */}
-            <div className="h-px bg-slate-100" />
+            {/* Local de venda */}
+            {locations.length > 0 && (
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Local
+                </label>
+                <select
+                  value={selectedLocationId}
+                  onChange={(e) => {
+                    setSelectedLocationId(e.target.value);
+                    setItems([]);
+                    setSearch("");
+                  }}
+                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  {locations.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.type === "store" ? "🏪" : "🏭"} {l.name}
+                    </option>
+                  ))}
+                </select>
+                <input type="hidden" name="locationId" value={selectedLocationId} />
+              </div>
+            )}
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Canal de venda
-              </label>
-              <select name="channel"
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                {CHANNEL_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Desconto (R$)
-              </label>
-              <div className="relative">
-                <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                <input
-                  type="number" min={0} max={subtotal} step="0.01"
-                  value={globalDiscount || ""}
-                  onChange={(e) => setGlobalDiscount(Number(e.target.value))}
-                  placeholder="0,00"
-                  className="w-full pl-8 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300"
-                />
+            {/* Canal + Desconto lado a lado */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Canal
+                </label>
+                <select name="channel"
+                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  {CHANNEL_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Desconto (R$)
+                </label>
+                <div className="relative">
+                  <Tag size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="number" min={0} max={subtotal} step="0.01"
+                    value={globalDiscount || ""}
+                    onChange={(e) => setGlobalDiscount(Number(e.target.value))}
+                    placeholder="0,00"
+                    className="w-full pl-6 pr-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300"
+                  />
+                </div>
               </div>
             </div>
 
+            {/* Observações */}
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
                 Observações
               </label>
-              <textarea name="notes" rows={3}
+              <textarea name="notes" rows={2}
                 placeholder="Informações adicionais…"
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none placeholder:text-slate-300"
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none placeholder:text-slate-300"
               />
             </div>
           </div>
 
           {/* Total + finalizar */}
-          <div className="p-5 border-t border-slate-100 shrink-0 space-y-4">
-            <div className="space-y-2.5">
-              <div className="flex justify-between text-sm">
+          <div className="px-3 py-3 border-t border-slate-100 shrink-0 space-y-3">
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs">
                 <span className="text-slate-500">Subtotal</span>
                 <span className="font-medium text-slate-700 tabular-nums">{formatCurrency(subtotal)}</span>
               </div>
               {globalDiscount > 0 && (
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs">
                   <span className="text-red-500">Desconto</span>
                   <span className="font-medium text-red-500 tabular-nums">− {formatCurrency(globalDiscount)}</span>
                 </div>
               )}
-              <div className="flex items-end justify-between pt-3 border-t border-slate-100">
-                <span className="text-base font-bold text-slate-900">Total</span>
-                <span className="text-3xl font-bold text-emerald-600 tabular-nums leading-none">
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <span className="text-sm font-bold text-slate-900">Total</span>
+                <span className="text-2xl font-bold text-emerald-600 tabular-nums leading-none">
                   {formatCurrency(total)}
                 </span>
               </div>
             </div>
 
             {state?.error && (
-              <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                <AlertCircle size={13} className="shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">
+                <AlertCircle size={12} className="shrink-0 mt-0.5" />
                 {state.error}
               </div>
             )}
@@ -623,12 +722,34 @@ export function SaleForm({ variants }: { variants: Variant[] }) {
             <SubmitButton disabled={items.length === 0} />
 
             <Link href="/vendas"
-              className="block text-center text-sm text-slate-400 hover:text-slate-600 transition-colors">
+              className="block text-center text-xs text-slate-400 hover:text-slate-600 transition-colors">
               Cancelar
             </Link>
           </div>
         </div>
       </div>
+
+      {/* Modal catálogo */}
+      {showCatalog && (
+        <ProductCatalogModal
+          variants={locationVariants}
+          cartVariantIds={new Set(items.map((i) => i.variantId))}
+          onSelect={addItemFromCatalog}
+          onClose={() => setShowCatalog(false)}
+        />
+      )}
+
+      {/* Modal novo cliente */}
+      {showNewCustomerModal && (
+        <NewCustomerModal
+          initial={newCustomer ?? undefined}
+          onConfirm={(data) => {
+            setNewCustomer(data);
+            setShowNewCustomerModal(false);
+          }}
+          onClose={() => setShowNewCustomerModal(false)}
+        />
+      )}
     </form>
   );
 }

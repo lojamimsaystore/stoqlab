@@ -53,17 +53,19 @@ export async function createSaleAction(
 
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  // Busca localização padrão
+  // Valida localização informada
+  const locationId = (formData.get("locationId") as string)?.trim();
+  if (!locationId) return { error: "Selecione o local de venda." };
+
   const { data: loc } = await supabaseAdmin
     .from("locations")
     .select("id")
+    .eq("id", locationId)
     .eq("tenant_id", tenantId)
     .is("deleted_at", null)
-    .limit(1)
     .single();
 
-  if (!loc) return { error: "Nenhuma localização cadastrada." };
-  const locationId = loc.id;
+  if (!loc) return { error: "Localização inválida." };
 
   // Valida estoque disponível
   for (const item of parsed.data.items) {
@@ -79,6 +81,17 @@ export async function createSaleAction(
     }
   }
 
+  // Parcelamento (só relevante para crédito)
+  const rawInstallments = parseInt(formData.get("installments") as string, 10);
+  const installments = parsed.data.paymentMethod === "credit" && rawInstallments > 1 ? rawInstallments : 1;
+  const hasInterest = formData.get("hasInterest") === "true";
+  const actualPaymentMethod = parsed.data.paymentMethod === "credit" && installments > 1
+    ? "installment" as const
+    : parsed.data.paymentMethod;
+  const installmentNote = installments > 1
+    ? `${installments}x ${hasInterest ? "com juros" : "sem juros"}`
+    : null;
+
   const totalValue = parsed.data.items.reduce(
     (s, i) => s + i.quantity * (i.salePrice - i.discount),
     0
@@ -91,8 +104,11 @@ export async function createSaleAction(
   // Resolve cliente (existente ou cria novo)
   const customerId = (formData.get("customerId") as string) || null;
   const customerName = ((formData.get("customerName") as string) || "").trim();
-  const customerPhone = ((formData.get("customerPhone") as string) || "").trim() || null;
-  const customerEmail = ((formData.get("customerEmail") as string) || "").trim() || null;
+  const rawCpf = ((formData.get("customerCpf") as string) || "").replace(/\D/g, "");
+  const rawPhone = ((formData.get("customerPhone") as string) || "").replace(/\D/g, "");
+  const customerCpf = rawCpf.length === 11 ? rawCpf : null;
+  const customerPhone = rawPhone.length >= 10 ? rawPhone : null;
+  const customerEmail = ((formData.get("customerEmail") as string) || "").trim().toLowerCase() || null;
   const customerBirthdate = ((formData.get("customerBirthdate") as string) || "").trim() || null;
   const customerAddress = ((formData.get("customerAddress") as string) || "").trim() || null;
 
@@ -103,6 +119,7 @@ export async function createSaleAction(
       .insert({
         tenant_id: tenantId,
         name: customerName,
+        cpf: customerCpf,
         phone: customerPhone,
         email: customerEmail,
         birthdate: customerBirthdate,
@@ -122,11 +139,11 @@ export async function createSaleAction(
       customer_id: resolvedCustomerId,
       status: "completed",
       channel: parsed.data.channel,
-      payment_method: parsed.data.paymentMethod,
+      payment_method: actualPaymentMethod,
       total_value: totalValue.toFixed(2),
       total_cost: "0",
       discount_value: discountValue.toFixed(2),
-      notes: parsed.data.notes ?? null,
+      notes: [installmentNote, parsed.data.notes || null].filter(Boolean).join(" | ") || null,
       sold_at: new Date().toISOString(),
     })
     .select("id")
@@ -183,6 +200,39 @@ export async function createSaleAction(
   revalidatePath("/vendas");
   revalidatePath("/estoque");
   redirect("/vendas");
+}
+
+export type DuplicateConflict = { field: "cpf" | "phone" | "email"; customerName: string };
+
+export async function checkCustomerDuplicateAction(fields: {
+  cpf: string;
+  phone: string;
+  email: string;
+}): Promise<DuplicateConflict[]> {
+  const tenantId = await getTenantId();
+  const conflicts: DuplicateConflict[] = [];
+
+  const cpfDigits = fields.cpf.replace(/\D/g, "");
+  const phoneDigits = fields.phone.replace(/\D/g, "");
+
+  const checks: Array<{ field: DuplicateConflict["field"]; column: string; value: string }> = [];
+  if (cpfDigits.length === 11)    checks.push({ field: "cpf",   column: "cpf",   value: cpfDigits });
+  if (phoneDigits.length >= 10)   checks.push({ field: "phone", column: "phone", value: phoneDigits });
+  if (fields.email.includes("@")) checks.push({ field: "email", column: "email", value: fields.email.trim().toLowerCase() });
+
+  for (const check of checks) {
+    const { data } = await supabaseAdmin
+      .from("customers")
+      .select("name")
+      .eq("tenant_id", tenantId)
+      .eq(check.column, check.value)
+      .is("deleted_at", null)
+      .limit(1)
+      .single();
+    if (data) conflicts.push({ field: check.field, customerName: data.name });
+  }
+
+  return conflicts;
 }
 
 export async function searchCustomersAction(query: string): Promise<CustomerResult[]> {

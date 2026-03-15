@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Plus, ShoppingBag } from "lucide-react";
+import { Plus, ShoppingBag, Eye } from "lucide-react";
+import { PrintReceiptButton } from "./print-receipt-button";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { formatCurrency, formatDate } from "@stoqlab/utils";
@@ -15,6 +16,13 @@ const PAYMENT_LABELS: Record<string, string> = {
   credit: "Crédito",
   installment: "Parcelado",
 };
+
+function parseInstallments(notes: string | null): string | null {
+  if (!notes) return null;
+  const match = notes.match(/^(\d+)x (com|sem) juros/);
+  if (!match) return null;
+  return `${match[1]}x ${match[2] === "com" ? "c/ juros" : "s/ juros"}`;
+}
 
 const STATUS_COLOR: Record<string, string> = {
   completed: "bg-emerald-100 text-emerald-700",
@@ -40,7 +48,7 @@ export default async function VendasPage({
 
   let query = supabaseAdmin
     .from("sales")
-    .select("id, status, payment_method, channel, total_value, discount_value, gross_margin, sold_at")
+    .select("id, status, payment_method, channel, total_value, discount_value, gross_margin, sold_at, notes, customers(name), locations(name)")
     .eq("tenant_id", tenantId)
     .is("deleted_at", null)
     .order("sold_at", { ascending: false });
@@ -48,21 +56,17 @@ export default async function VendasPage({
   if (status && status !== "all") {
     query = query.eq("status", status);
   }
+  if (q) {
+    query = query.or(`payment_method.ilike.%${q}%,customers.name.ilike.%${q}%`);
+  }
 
   const { data: sales } = await query;
+  const filtered = sales ?? [];
 
-  // Filtro de busca por método de pagamento (client-side após query)
-  const filtered = q
-    ? (sales ?? []).filter((s) => {
-        const label = (PAYMENT_LABELS[s.payment_method] ?? s.payment_method).toLowerCase();
-        return label.includes(q.toLowerCase());
-      })
-    : (sales ?? []);
-
+  const now = new Date();
   const totalMes = (sales ?? [])
     .filter((s) => {
       const d = new Date(s.sold_at);
-      const now = new Date();
       return s.status === "completed" && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     })
     .reduce((sum, s) => sum + Number(s.total_value), 0);
@@ -100,7 +104,7 @@ export default async function VendasPage({
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-2">
         <Suspense fallback={null}>
-          <SearchInput placeholder="Buscar por método de pagamento…" className="flex-1" />
+          <SearchInput placeholder="Buscar por cliente ou método de pagamento…" className="flex-1" />
         </Suspense>
         <Suspense fallback={null}>
           <StatusFilter />
@@ -125,8 +129,11 @@ export default async function VendasPage({
             <thead>
               <tr className="bg-slate-50 text-left border-b border-slate-100">
                 <th className="px-4 py-3 font-medium text-slate-600">Data</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">Pagamento</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell">Desconto</th>
+                <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">Cliente</th>
+                <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell">Pagamento</th>
+                <th className="px-4 py-3 font-medium text-slate-600 hidden xl:table-cell">Parcelas</th>
+                <th className="px-4 py-3 font-medium text-slate-600 hidden lg:table-cell">Local</th>
+                <th className="px-4 py-3 font-medium text-slate-600 hidden lg:table-cell">Desconto</th>
                 <th className="px-4 py-3 font-medium text-slate-600 text-right">Total</th>
                 <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell text-right">Margem</th>
                 <th className="px-4 py-3 font-medium text-slate-600">Status</th>
@@ -134,13 +141,26 @@ export default async function VendasPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map((s) => (
+              {filtered.map((s) => {
+                const customer = (s.customers as unknown as Array<{ name: string }> | null)?.[0] ?? null;
+                const location = s.locations as { name: string } | null;
+                const installmentLabel = parseInstallments(s.notes ?? null);
+                return (
                 <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3 text-slate-700">{formatDate(s.sold_at)}</td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-slate-600">
+                  <td className="px-4 py-3 hidden sm:table-cell text-slate-700">
+                    {customer?.name ?? <span className="text-slate-400">—</span>}
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell text-slate-600">
                     {PAYMENT_LABELS[s.payment_method] ?? s.payment_method}
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-500">
+                  <td className="px-4 py-3 hidden xl:table-cell text-slate-500 text-xs">
+                    {installmentLabel ?? <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs">
+                    {location?.name ?? <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-slate-500">
                     {Number(s.discount_value) > 0 ? formatCurrency(Number(s.discount_value)) : "—"}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold text-slate-900">
@@ -155,15 +175,17 @@ export default async function VendasPage({
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-3">
-                      <Link href={`/vendas/${s.id}`} className="text-xs text-blue-600 hover:text-blue-700 font-medium">
-                        Ver
+                    <div className="flex items-center justify-end gap-1">
+                      <PrintReceiptButton id={s.id} />
+                      <Link href={`/vendas/${s.id}`} title="Ver venda" aria-label="Ver detalhes da venda"
+                        className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded inline-flex">
+                        <Eye size={15} />
                       </Link>
                       {s.status === "completed" && <CancelSaleButton id={s.id} />}
                     </div>
                   </td>
                 </tr>
-              ))}
+              );})}
             </tbody>
           </table>
         )}

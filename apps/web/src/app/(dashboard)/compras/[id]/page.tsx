@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye } from "lucide-react";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
@@ -67,9 +67,11 @@ export default async function CompraDetailPage({ params }: { params: { id: strin
                 href={purchase.invoice_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                title="Ver nota fiscal"
               >
-                Ver NF
+                <Eye size={13} />
+                NF
               </a>
             )}
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLOR[purchase.status] ?? ""}`}>

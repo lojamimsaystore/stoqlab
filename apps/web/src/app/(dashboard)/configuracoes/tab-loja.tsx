@@ -14,7 +14,7 @@ function SubmitButton() {
 }
 
 export function TabLoja({ tenant }: {
-  tenant: { name: string; settings: Record<string, string> };
+  tenant: { name: string; settings: Record<string, unknown> };
 }) {
   const [state, formAction] = useFormState(updateTenantAction, {});
 
@@ -33,13 +33,13 @@ export function TabLoja({ tenant }: {
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-          <input name="phone" defaultValue={tenant.settings?.phone ?? ""}
+          <input name="phone" defaultValue={(tenant.settings?.phone as string) ?? ""}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="(00) 00000-0000" />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Endereço</label>
-          <input name="address" defaultValue={tenant.settings?.address ?? ""}
+          <input name="address" defaultValue={(tenant.settings?.address as string) ?? ""}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Rua, número, cidade..." />
         </div>

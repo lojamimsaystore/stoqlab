@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { ArrowLeft, Plus, Package } from "lucide-react";
+import { ArrowLeft, Package } from "lucide-react";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { formatCurrency } from "@stoqlab/utils";
 import { AddVariantSection } from "./add-variant-section";
 import { DeleteVariantButton } from "./delete-variant-button";
-import { updateProductAction, deleteVariantAction } from "../actions";
+
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Ativo", draft: "Rascunho", archived: "Arquivado",
@@ -24,7 +24,7 @@ export default async function ProdutoPage({
 }) {
   const tenantId = await getTenantId();
 
-  const [{ data: product }, { data: variants }, { data: categories }] =
+  const [{ data: product }, { data: variants }] =
     await Promise.all([
       supabaseAdmin
         .from("products")
@@ -43,12 +43,6 @@ export default async function ProdutoPage({
         .eq("tenant_id", tenantId)
         .is("deleted_at", null)
         .order("created_at"),
-      supabaseAdmin
-        .from("categories")
-        .select("id, name")
-        .eq("tenant_id", tenantId)
-        .is("deleted_at", null)
-        .order("name"),
     ]);
 
   if (!product) notFound();

@@ -14,11 +14,14 @@ const itemSchema = z.object({
 
 const PAYMENT_METHODS = ["cash", "pix", "debit", "credit"] as const;
 
+const PURCHASE_STATUSES = ["received", "cancelled", "confirmed"] as const;
+
 const purchaseSchema = z.object({
   supplierId: z.string().uuid().optional(),
   invoiceNumber: z.string().min(1, "Nº nota fiscal obrigatório").max(60),
   purchasedAt: z.string().min(1, "Data obrigatória"),
   paymentMethod: z.enum(PAYMENT_METHODS, { errorMap: () => ({ message: "Forma de pagamento obrigatória" }) }),
+  status: z.enum(PURCHASE_STATUSES).default("received"),
   freightCost: z.number().min(0).default(0),
   otherCosts: z.number().min(0).default(0),
   notes: z.string().max(500).optional(),
@@ -119,6 +122,7 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
     invoiceNumber: formData.get("invoiceNumber") || undefined,
     purchasedAt: formData.get("purchasedAt"),
     paymentMethod: formData.get("paymentMethod") || undefined,
+    status: formData.get("purchaseStatus") || "received",
     freightCost: Number(formData.get("freightCost") || 0),
     otherCosts: Number(formData.get("otherCosts") || 0),
     notes: formData.get("notes") || undefined,
@@ -127,7 +131,7 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
 
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const { supplierId, invoiceNumber, purchasedAt, paymentMethod, freightCost, otherCosts, notes } = parsed.data;
+  const { supplierId, invoiceNumber, purchasedAt, paymentMethod, status, freightCost, otherCosts, notes } = parsed.data;
 
   const locationId = await getOrCreateDefaultLocation(tenantId);
 
@@ -203,7 +207,7 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
       tenant_id: tenantId,
       supplier_id: supplierId ?? null,
       location_id: locationId,
-      status: "received",
+      status,
       invoice_number: invoiceNumber ?? null,
       products_cost: productsCost.toFixed(2),
       freight_cost: freightCost.toFixed(2),
@@ -212,7 +216,7 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
       payment_method: paymentMethod ?? null,
       notes: notes ?? null,
       purchased_at: new Date(purchasedAt).toISOString(),
-      received_at: new Date().toISOString(),
+      received_at: status === "received" ? new Date().toISOString() : null,
     })
     .select("id")
     .single();
@@ -289,6 +293,23 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
   revalidatePath("/compras");
   revalidatePath("/estoque");
   redirect("/compras");
+}
+
+export async function updatePurchaseStatusAction(
+  id: string,
+  status: "received" | "confirmed" | "cancelled"
+): Promise<void> {
+  const tenantId = await getTenantId();
+  await supabaseAdmin
+    .from("purchases")
+    .update({
+      status,
+      received_at: status === "received" ? new Date().toISOString() : null,
+    })
+    .eq("id", id)
+    .eq("tenant_id", tenantId);
+
+  revalidatePath("/compras");
 }
 
 export async function uploadInvoiceAction(

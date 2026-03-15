@@ -6,20 +6,9 @@ import { formatCurrency, formatDate } from "@stoqlab/utils";
 import { DeletePurchaseButton } from "./delete-purchase-button";
 import { SearchInput } from "@/components/ui/search-input";
 import { StatusFilter } from "./status-filter";
+import { PurchaseStatusSelect } from "./purchase-status-select";
 import { Suspense } from "react";
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: "Rascunho",
-  confirmed: "Confirmada",
-  received: "Recebida",
-  cancelled: "Cancelada",
-};
-const STATUS_COLOR: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-600",
-  confirmed: "bg-blue-100 text-blue-700",
-  received: "bg-emerald-100 text-emerald-700",
-  cancelled: "bg-red-100 text-red-600",
-};
 
 export default async function ComprasPage({
   searchParams,
@@ -140,9 +129,7 @@ export default async function ComprasPage({
                       {formatCurrency(total)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLOR[p.status] ?? ""}`}>
-                        {STATUS_LABEL[p.status]}
-                      </span>
+                      <PurchaseStatusSelect id={p.id} status={p.status} />
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">

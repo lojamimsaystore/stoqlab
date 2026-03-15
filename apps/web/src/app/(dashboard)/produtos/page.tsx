@@ -3,6 +3,7 @@ import { Package, Plus } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { DeleteProductButton } from "./components/delete-product-button";
+import { ArchiveProductButton } from "./components/archive-product-button";
 import { SearchInput } from "@/components/ui/search-input";
 import { ProductStatusFilter } from "./components/product-status-filter";
 import { Suspense } from "react";
@@ -121,9 +122,10 @@ export default async function ProdutosPage({
                 key={p.id}
                 className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md hover:border-slate-300 transition-all flex flex-col group relative"
               >
-                {/* Lixeira */}
+                {/* Ações no hover */}
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-sm">
+                  <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-sm flex items-center">
+                    <ArchiveProductButton id={p.id} status={p.status} />
                     <DeleteProductButton id={p.id} name={p.name} />
                   </div>
                 </div>

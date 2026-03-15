@@ -18,10 +18,18 @@ type InventoryRow = {
   minStock: number;
 };
 
-export function EstoqueTable({ rows }: { rows: InventoryRow[] }) {
+export function EstoqueTable({ rows, lowStockThreshold = 5 }: { rows: InventoryRow[]; lowStockThreshold?: number }) {
   const [search, setSearch] = useState("");
   const [filterLow, setFilterLow] = useState(false);
+  const [filterLocation, setFilterLocation] = useState("");
   const [adjusting, setAdjusting] = useState<InventoryRow | null>(null);
+
+  const isLowStock = (qty: number) => qty >= 1 && qty <= lowStockThreshold;
+
+  // Locais únicos derivados das linhas
+  const locations = Array.from(
+    new Map(rows.map((r) => [r.locationId, r.locationName])).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]));
 
   const filtered = rows.filter((r) => {
     const matchSearch =
@@ -29,12 +37,13 @@ export function EstoqueTable({ rows }: { rows: InventoryRow[] }) {
       r.productName.toLowerCase().includes(search.toLowerCase()) ||
       r.sku.toLowerCase().includes(search.toLowerCase()) ||
       r.color.toLowerCase().includes(search.toLowerCase());
-    const matchLow = !filterLow || r.quantity <= r.minStock;
-    return matchSearch && matchLow;
+    const matchLow = !filterLow || isLowStock(r.quantity);
+    const matchLocation = !filterLocation || r.locationId === filterLocation;
+    return matchSearch && matchLow && matchLocation;
   });
 
-  const lowCount = rows.filter((r) => r.quantity <= r.minStock).length;
-  const zeroCount = rows.filter((r) => r.quantity === 0).length;
+  const lowCount = filtered.filter((r) => isLowStock(r.quantity)).length;
+  const zeroCount = filtered.filter((r) => r.quantity === 0).length;
 
   return (
     <div className="space-y-4">
@@ -49,6 +58,18 @@ export function EstoqueTable({ rows }: { rows: InventoryRow[] }) {
             className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+        {locations.length > 1 && (
+          <select
+            value={filterLocation}
+            onChange={(e) => setFilterLocation(e.target.value)}
+            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+          >
+            <option value="">Todos os locais</option>
+            {locations.map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
+        )}
         <button
           onClick={() => setFilterLow(!filterLow)}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition ${
@@ -97,7 +118,7 @@ export function EstoqueTable({ rows }: { rows: InventoryRow[] }) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map((row) => {
-                const isLow = row.quantity <= row.minStock && row.quantity > 0;
+                const isLow = isLowStock(row.quantity);
                 const isZero = row.quantity === 0;
                 return (
                   <tr key={row.id} className="hover:bg-slate-50">

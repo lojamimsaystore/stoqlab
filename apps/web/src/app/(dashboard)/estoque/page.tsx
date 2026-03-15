@@ -6,6 +6,16 @@ import { CleanOrphansButton } from "./clean-orphans-button";
 export default async function EstoquePage() {
   const tenantId = await getTenantId();
 
+  const { data: tenantData } = await supabaseAdmin
+    .from("tenants")
+    .select("settings")
+    .eq("id", tenantId)
+    .single();
+  const settings = (tenantData?.settings as Record<string, unknown>) ?? {};
+  const lowStockThreshold = typeof settings.low_stock_threshold === "number"
+    ? settings.low_stock_threshold
+    : 5;
+
   const { data: variants } = await supabaseAdmin
     .from("product_variants")
     .select(`
@@ -56,7 +66,7 @@ export default async function EstoquePage() {
         </p>
       </div>
       <CleanOrphansButton count={orphanCount} />
-      <EstoqueTable rows={tableRows} />
+      <EstoqueTable rows={tableRows} lowStockThreshold={lowStockThreshold} />
     </div>
   );
 }

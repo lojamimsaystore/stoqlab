@@ -10,7 +10,7 @@ import { uploadTempPhotoAction } from "@/app/(dashboard)/produtos/actions";
 import { formatCurrency } from "@stoqlab/utils";
 import { QuickAddSupplierModal } from "./quick-add-supplier-modal";
 import { QuickAddProductModal } from "./quick-add-product-modal";
-import { QuickAddVariantModal } from "./quick-add-variant-modal";
+import { QuickAddVariantModal, type CreatedVariant } from "./quick-add-variant-modal";
 
 type Supplier = { id: string; name: string };
 type Category = { id: string; name: string };
@@ -119,6 +119,9 @@ export function PurchaseForm({
 
   const selectedProduct = products.find((p) => p.id === selectedProductId);
   const selectedVariant = selectedProduct?.variants.find((v) => v.id === selectedVariantId);
+  // Produto pendente (criado via modal, ainda não está no dropdown de produtos)
+  const selectedPendingProduct = pendingProducts.find((p) => p.tempId === selectedProductId && !selectedProduct);
+  const effectiveProductName = selectedProduct?.name ?? selectedPendingProduct?.name ?? "";
 
   function addItem() {
     if (!selectedVariant || qty < 1) return;
@@ -222,7 +225,7 @@ export function PurchaseForm({
         onClose={() => setProductModalOpen(false)}
         defaultName={productSearch}
         onCreated={(p) => {
-          setProducts((prev) => [...prev, { id: p.tempId, name: p.name, imageUrl: null, variants: [], isPending: true }].sort((a, b) => a.name.localeCompare(b.name)));
+          // Produto pendente: rastreado em pendingProducts mas NÃO adicionado ao dropdown
           setPendingProducts((prev) => [...prev, { tempId: p.tempId, name: p.name }]);
           setSelectedCategoryId("");
           setSelectedProductId(p.tempId);
@@ -249,13 +252,41 @@ export function PurchaseForm({
         open={variantModalOpen}
         onClose={() => setVariantModalOpen(false)}
         productId={selectedProductId}
-        productName={selectedProduct?.name ?? ""}
-        onCreated={(v) => {
-          setProducts((prev) => prev.map((p) =>
-            p.id === selectedProductId ? { ...p, variants: [...p.variants, { id: v.tempId, color: v.color, size: v.size, sku: "" }] } : p
-          ));
-          setPendingVariants((prev) => [...prev, { tempId: v.tempId, productTempId: selectedProductId, color: v.color, colorHex: v.colorHex, size: v.size, photoUrl: v.photoUrl }]);
-          setSelectedVariantId(v.tempId);
+        productName={effectiveProductName}
+        onCreated={(variants: CreatedVariant[]) => {
+          const prodId   = selectedProductId;
+          const prodName = effectiveProductName;
+          const prodImage = selectedProduct?.imageUrl ?? null;
+
+          // Rastreia variantes pendentes para criação server-side
+          setPendingVariants((prev) => [...prev, ...variants.map((v) => ({
+            tempId: v.tempId,
+            productTempId: prodId,
+            color: v.color,
+            colorHex: v.colorHex,
+            size: v.size,
+            photoUrl: v.photoUrl,
+          }))]);
+
+          // Adiciona diretamente na tabela de itens — NÃO aparece nos dropdowns
+          setItems((prev) => {
+            const toAdd = variants
+              .filter((v) => !prev.some((i) => i.variantId === v.tempId))
+              .map((v) => ({
+                variantId: v.tempId,
+                productId: prodId,
+                productName: prodName,
+                imageUrl: v.photoUrl ?? prodImage,
+                label: `${v.color} · ${v.size}`,
+                quantity: v.quantity,
+                unitCost: v.unitCost,
+              }));
+            return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+          });
+
+          // Limpa seleção após adicionar
+          setSelectedProductId("");
+          setSelectedVariantId("");
         }}
       />
       <QuickAddVariantModal
@@ -291,7 +322,7 @@ export function PurchaseForm({
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
               Informações da compra
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
               {/* Fornecedor */}
               <div className="sm:col-span-2 lg:col-span-1">
                 <label className="block text-xs font-medium text-slate-700 mb-1">Fornecedor</label>
@@ -387,6 +418,45 @@ export function PurchaseForm({
                   <option value="credit">Crédito</option>
                 </select>
               </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Status <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="purchaseStatus"
+                  required
+                  defaultValue="received"
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+                >
+                  <option value="received">Recebida</option>
+                  <option value="confirmed">Em andamento</option>
+                  <option value="cancelled">Cancelada</option>
+                </select>
+              </div>
+
+              {/* Categoria */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Categoria</label>
+                <select
+                  value={selectedCategoryId}
+                  onChange={(e) => {
+                    const newCat = e.target.value;
+                    setSelectedCategoryId(newCat);
+                    if (newCat && selectedProduct && !selectedProduct.isPending && selectedProduct.categoryId !== newCat) {
+                      setSelectedProductId("");
+                      setSelectedVariantId("");
+                    }
+                  }}
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+                >
+                  <option value="">Todas</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -397,11 +467,11 @@ export function PurchaseForm({
             </h2>
 
             {/* Linha de adicionar item */}
-            <div className="shrink-0 grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_100px_120px_auto] gap-2 items-end">
+            <div className="shrink-0 grid grid-cols-1 sm:grid-cols-[1fr_1fr_100px_120px_auto] gap-2 items-end">
               {/* Produto */}
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Produto</label>
-                {products.length > 10 && (
+                {products.length > 10 && !selectedPendingProduct && (
                   <input
                     type="text"
                     value={productSearch}
@@ -410,93 +480,97 @@ export function PurchaseForm({
                     className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 placeholder:text-slate-400 mb-1"
                   />
                 )}
-                <div className="flex gap-1.5">
-                  <select
-                    value={selectedProductId}
-                    onChange={(e) => { setSelectedProductId(e.target.value); setSelectedVariantId(""); }}
-                    className="flex-1 min-w-0 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
-                  >
-                    <option value="">Selecione...</option>
-                    {products
-                      .filter((p) =>
-                        (p.isPending || !selectedCategoryId || p.categoryId === selectedCategoryId) &&
-                        (products.length <= 10 || p.name.toLowerCase().includes(productSearch.toLowerCase()))
-                      )
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                  </select>
-                  {selectedProduct?.isPending && (
+                {/* Produto pendente: mostra badge no lugar do dropdown */}
+                {selectedPendingProduct ? (
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 font-medium">
+                      <span className="text-[10px] bg-amber-200 text-amber-700 rounded px-1 py-0.5 font-semibold shrink-0">NOVO</span>
+                      <span className="truncate">{selectedPendingProduct.name}</span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setProductEditModalOpen(true)}
-                      title="Editar produto"
+                      title="Editar nome do produto"
                       className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:border-amber-400 hover:text-amber-500 transition shrink-0"
                     >
                       <Pencil size={13} />
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setProductModalOpen(true)}
-                    title="Cadastrar novo produto"
-                    className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600 transition shrink-0"
-                  >
-                    <Plus size={14} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Detalhes (variação) */}
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Detalhes</label>
-                <div className="flex gap-1.5">
-                  <select
-                    value={selectedVariantId}
-                    onChange={(e) => setSelectedVariantId(e.target.value)}
-                    disabled={!selectedProduct}
-                    className="flex-1 min-w-0 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800 disabled:bg-slate-50 disabled:text-slate-400"
-                  >
-                    <option value="">Selecione...</option>
-                    {selectedProduct?.variants.map((v) => (
-                      <option key={v.id} value={v.id}>{v.color} · {v.size}</option>
-                    ))}
-                  </select>
-                  {selectedVariantId && pendingVariants.some((v) => v.tempId === selectedVariantId) && (
                     <button
                       type="button"
-                      onClick={() => setVariantEditModalOpen(true)}
-                      title="Editar detalhe"
-                      className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:border-amber-400 hover:text-amber-500 transition shrink-0"
+                      onClick={() => { setSelectedProductId(""); setSelectedVariantId(""); }}
+                      title="Cancelar"
+                      className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-400 transition shrink-0"
                     >
-                      <Pencil size={13} />
+                      <X size={13} />
                     </button>
-                  )}
+                  </div>
+                ) : (
+                  <div className="flex gap-1.5">
+                    <select
+                      value={selectedProductId}
+                      onChange={(e) => { setSelectedProductId(e.target.value); setSelectedVariantId(""); }}
+                      className="flex-1 min-w-0 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+                    >
+                      <option value="">Selecione...</option>
+                      {products
+                        .filter((p) =>
+                          p.id === selectedProductId ||
+                          ((!selectedCategoryId || !p.categoryId || p.categoryId === selectedCategoryId) &&
+                          (products.length <= 10 || p.name.toLowerCase().includes(productSearch.toLowerCase())))
+                        )
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setProductModalOpen(true)}
+                      title="Cadastrar novo produto"
+                      className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600 transition shrink-0"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Detalhes (variação) — só para produtos existentes */}
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Detalhes</label>
+                {selectedPendingProduct ? (
+                  /* Produto novo: botão "+" abre modal direto, sem dropdown de variantes */
                   <button
                     type="button"
                     onClick={() => setVariantModalOpen(true)}
-                    disabled={!selectedProductId}
-                    title={selectedProductId ? "Adicionar cor/tamanho" : "Selecione um produto primeiro"}
-                    className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600 transition shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:text-slate-400"
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border-2 border-dashed border-blue-300 rounded-lg text-sm text-blue-600 hover:bg-blue-50 transition font-medium"
                   >
                     <Plus size={14} />
+                    Adicionar cor e tamanhos
                   </button>
-                </div>
-              </div>
-
-              {/* Categoria (filtro) */}
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Categoria</label>
-                <select
-                  value={selectedCategoryId}
-                  onChange={(e) => { setSelectedCategoryId(e.target.value); setSelectedProductId(""); setSelectedVariantId(""); }}
-                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
-                >
-                  <option value="">Selecione...</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                ) : (
+                  <div className="flex gap-1.5">
+                    <select
+                      value={selectedVariantId}
+                      onChange={(e) => setSelectedVariantId(e.target.value)}
+                      disabled={!selectedProduct}
+                      className="flex-1 min-w-0 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800 disabled:bg-slate-50 disabled:text-slate-400"
+                    >
+                      <option value="">Selecione...</option>
+                      {selectedProduct?.variants.map((v) => (
+                        <option key={v.id} value={v.id}>{v.color} · {v.size}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setVariantModalOpen(true)}
+                      disabled={!selectedProductId}
+                      title={selectedProductId ? "Adicionar cor/tamanho" : "Selecione um produto primeiro"}
+                      className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600 transition shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Quantidade */}

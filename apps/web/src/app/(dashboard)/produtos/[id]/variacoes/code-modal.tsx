@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Download, Printer } from "lucide-react";
 import QRCode from "qrcode";
 import JsBarcode from "jsbarcode";
@@ -14,7 +14,6 @@ type Props = {
 };
 
 export function CodeModal({ open, onClose, type, sku, label }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
 
   useEffect(() => {

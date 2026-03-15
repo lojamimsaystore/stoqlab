@@ -2,8 +2,20 @@
 
 import { useState } from "react";
 import { changeTenantPlanAction, toggleTenantActiveAction, deleteTenantAction } from "./actions";
-import { Trash2 } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { useRouter } from "next/navigation";
+
+const ROLE_LABELS: Record<string, string> = {
+  manager: "Gerente",
+  seller: "Vendedor",
+  stock_operator: "Estoque",
+};
+
+const ROLE_COLORS: Record<string, string> = {
+  manager: "bg-blue-50 text-blue-600",
+  seller: "bg-emerald-50 text-emerald-600",
+  stock_operator: "bg-amber-50 text-amber-600",
+};
 
 const PLAN_LABELS: Record<string, string> = {
   trial: "Free Trial",
@@ -30,11 +42,14 @@ type Tenant = {
   user_count: number;
   created_at: string;
   owner: { name: string; email: string } | null;
+  employees: { name: string; role: string }[];
 };
 
 export function TenantRow({ tenant }: { tenant: Tenant }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const hasEmployees = tenant.employees.length > 0;
 
   async function handlePlanChange(plan: string) {
     setSaving(true);
@@ -63,10 +78,38 @@ export function TenantRow({ tenant }: { tenant: Tenant }) {
   return (
     <tr className={`hover:bg-slate-50 ${!isActive ? "opacity-50" : ""}`}>
       <td className="px-4 py-3">
-        <span className="font-medium text-slate-900">{tenant.name}</span>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {new Date(tenant.created_at).toLocaleDateString("pt-BR")}
-        </p>
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <span className="font-medium text-slate-900">{tenant.name}</span>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {new Date(tenant.created_at).toLocaleDateString("pt-BR")}
+            </p>
+          </div>
+          {hasEmployees && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              title={expanded ? "Ocultar funcionários" : "Ver funcionários"}
+              className="mt-0.5 text-slate-400 hover:text-slate-700 transition-colors shrink-0"
+            >
+              {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          )}
+        </div>
+
+        {/* Lista de funcionários */}
+        {expanded && hasEmployees && (
+          <div className="mt-2.5 pl-0.5 space-y-1.5 border-l-2 border-slate-100 pl-3">
+            {tenant.employees.map((e, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-xs text-slate-700 leading-none">{e.name}</span>
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${ROLE_COLORS[e.role] ?? "bg-slate-100 text-slate-500"}`}>
+                  {ROLE_LABELS[e.role] ?? e.role}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </td>
       <td className="px-4 py-3">
         {tenant.owner ? (

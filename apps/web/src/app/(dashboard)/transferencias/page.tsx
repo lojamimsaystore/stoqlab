@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, ArrowLeftRight } from "lucide-react";
+import { Plus, ArrowLeftRight, Eye } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { formatDate } from "@stoqlab/utils";
@@ -102,7 +102,10 @@ export default async function TransferenciasPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/transferencias/${t.id}`} className="text-xs text-blue-600 hover:text-blue-700 font-medium">Ver</Link>
+                      <Link href={`/transferencias/${t.id}`} title="Ver transferência" aria-label="Ver detalhes da transferência"
+                        className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded inline-flex">
+                        <Eye size={15} />
+                      </Link>
                     </td>
                   </tr>
                 );

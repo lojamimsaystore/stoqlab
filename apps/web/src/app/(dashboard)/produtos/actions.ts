@@ -97,7 +97,7 @@ export async function createProductAction(
   if (!parsed.success)
     return { error: parsed.error.errors[0]?.message ?? "Dados inválidos" };
 
-  const { name, categoryId, description, color, size, quantity, salePrice, costPrice, purchaseDate } = parsed.data;
+  const { name, categoryId, description, color, size, quantity, salePrice, purchaseDate } = parsed.data;
 
   // 1. Criar produto
   const { data: product, error: productError } = await supabaseAdmin
@@ -213,6 +213,22 @@ export async function updateProductAction(
 
   revalidatePath("/produtos");
   redirect(`/produtos/${id}`);
+}
+
+// ─── Arquivar / Restaurar produto ────────────────────────────
+
+export async function toggleProductArchiveAction(
+  id: string,
+  currentStatus: string,
+): Promise<void> {
+  const tenantId = await getTenantId();
+  const newStatus = currentStatus === "archived" ? "active" : "archived";
+  await supabaseAdmin
+    .from("products")
+    .update({ status: newStatus })
+    .eq("id", id)
+    .eq("tenant_id", tenantId);
+  revalidatePath("/produtos");
 }
 
 // ─── Excluir produto ──────────────────────────────────────────
@@ -436,6 +452,29 @@ export async function updateVariantsSalePriceAction(
 
   revalidatePath(`/produtos/${productId}/variacoes`);
   return {};
+}
+
+// ─── Limpar variações órfãs (produtos deletados) ─────────────
+
+export async function cleanOrphanVariantsAction(): Promise<void> {
+  const tenantId = await getTenantId();
+
+  // Busca variações cujo produto foi deletado (deleted_at não nulo)
+  const { data: orphans } = await supabaseAdmin
+    .from("product_variants")
+    .select("id, product_id, products!inner(deleted_at)")
+    .eq("tenant_id", tenantId)
+    .not("products.deleted_at", "is", null);
+
+  const orphanIds = orphans?.map((v) => v.id) ?? [];
+  if (orphanIds.length === 0) return;
+
+  await supabaseAdmin.from("inventory_movements").delete().in("variant_id", orphanIds);
+  await supabaseAdmin.from("inventory").delete().in("variant_id", orphanIds);
+  await supabaseAdmin.from("product_variants").delete().in("id", orphanIds);
+
+  revalidatePath("/estoque");
+  revalidatePath("/produtos");
 }
 
 // ─── Excluir variação ─────────────────────────────────────────

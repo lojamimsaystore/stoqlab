@@ -48,10 +48,21 @@ type SidebarProps = {
   userName: string;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  userPermissions?: string[];
+  userRole?: string;
 };
 
-export function Sidebar({ open, onClose, tenantName, userName, collapsed, onToggleCollapse }: SidebarProps) {
+export function Sidebar({
+  open, onClose, tenantName, userName, collapsed, onToggleCollapse,
+  userPermissions = [], userRole = "owner",
+}: SidebarProps) {
   const pathname = usePathname();
+
+  const visibleItems = NAV_ITEMS.filter(({ href }) => {
+    if (userRole === "owner" || userRole === "master") return true;
+    const key = href === "/" ? "dashboard" : href.slice(1);
+    return userPermissions.includes(key);
+  });
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -69,6 +80,7 @@ export function Sidebar({ open, onClose, tenantName, userName, collapsed, onTogg
           fixed inset-y-0 left-0 z-30 bg-slate-900 text-white flex flex-col
           transform transition-all duration-200 ease-in-out
           lg:relative lg:translate-x-0 lg:z-auto
+          print:hidden
           ${open ? "translate-x-0" : "-translate-x-full"}
           ${collapsed ? "lg:w-[60px]" : "lg:w-64"} w-64
         `}
@@ -109,7 +121,7 @@ export function Sidebar({ open, onClose, tenantName, userName, collapsed, onTogg
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+          {visibleItems.map(({ href, label, icon: Icon }) => {
             const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
 
             if (collapsed) {

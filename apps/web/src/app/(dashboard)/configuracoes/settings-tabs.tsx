@@ -1,23 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, User, MapPin, Users, CreditCard } from "lucide-react";
+import { Building2, User, MapPin, Users, CreditCard, Info } from "lucide-react";
 import { TabLoja } from "./tab-loja";
 import { TabConta } from "./tab-conta";
 import { TabLocalizacoes } from "./tab-localizacoes";
 import { TabUsuarios } from "./tab-usuarios";
 import { TabPlano } from "./tab-plano";
+import { TabInformacoes } from "./tab-informacoes";
 
 const TABS = [
-  { id: "loja", label: "Dados da loja", icon: Building2 },
-  { id: "conta", label: "Minha conta", icon: User },
-  { id: "localizacoes", label: "Localizações", icon: MapPin },
-  { id: "usuarios", label: "Usuários", icon: Users },
-  { id: "plano", label: "Plano", icon: CreditCard },
+  { id: "loja",         label: "Dados da loja",  icon: Building2 },
+  { id: "informacoes",  label: "Informações",     icon: Info       },
+  { id: "conta",        label: "Minha conta",     icon: User       },
+  { id: "localizacoes", label: "Localizações",    icon: MapPin     },
+  { id: "usuarios",     label: "Usuários",        icon: Users      },
+  { id: "plano",        label: "Plano",           icon: CreditCard },
 ];
 
 export function SettingsTabs(props: {
-  tenant: { id: string; name: string; plan: string; trial_ends_at: string | null; settings: Record<string, string> };
+  tenant: { id: string; name: string; plan: string; trial_ends_at: string | null; settings: Record<string, unknown> };
   user: { id: string; name: string; email: string; role: string };
   locations: { id: string; name: string; type: string }[];
   users: { id: string; name: string; email: string; role: string; is_active: boolean }[];
@@ -26,12 +28,10 @@ export function SettingsTabs(props: {
   const isOwner = props.currentUserRole === "owner";
   const [active, setActive] = useState("loja");
 
-  const visibleTabs = TABS.filter((tab) => {
-    if (tab.id === "usuarios" || tab.id === "plano" || tab.id === "loja" || tab.id === "localizacoes") {
-      return isOwner;
-    }
-    return true;
-  });
+  const OWNER_ONLY_TABS = new Set(["loja", "informacoes", "localizacoes", "usuarios", "plano"]);
+  const visibleTabs = TABS.filter((tab) =>
+    OWNER_ONLY_TABS.has(tab.id) ? isOwner : true
+  );
 
   return (
     <div className="space-y-6">
@@ -55,7 +55,8 @@ export function SettingsTabs(props: {
 
       {/* Conteúdo */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
-        {active === "loja" && <TabLoja tenant={props.tenant} />}
+        {active === "loja"         && <TabLoja tenant={props.tenant} />}
+        {active === "informacoes"  && <TabInformacoes settings={props.tenant.settings} />}
         {active === "conta" && <TabConta user={props.user} />}
         {active === "localizacoes" && <TabLocalizacoes locations={props.locations} />}
         {active === "usuarios" && <TabUsuarios users={props.users} currentUserId={props.user.id} />}

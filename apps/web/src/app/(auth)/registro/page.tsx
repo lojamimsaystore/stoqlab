@@ -5,6 +5,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { registrarAction } from "./actions";
+import { GoogleButton } from "@/components/auth/google-button";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -38,6 +39,16 @@ export default function RegistroPage() {
       <p className="text-sm text-slate-500 mb-6">
         14 dias grátis, sem cartão de crédito
       </p>
+
+      {/* Registro com Google */}
+      <div className="mb-5">
+        <GoogleButton next="/completar-cadastro" label="Registrar com Google" />
+        <div className="flex items-center gap-3 mt-4">
+          <div className="flex-1 h-px bg-slate-200" />
+          <span className="text-xs text-slate-400">ou preencha os dados</span>
+          <div className="flex-1 h-px bg-slate-200" />
+        </div>
+      </div>
 
       <form action={action} className="space-y-4">
         <div>

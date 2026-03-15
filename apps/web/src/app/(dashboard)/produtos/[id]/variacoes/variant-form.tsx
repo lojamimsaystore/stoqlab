@@ -18,26 +18,14 @@ function SubmitButton() {
   );
 }
 
-function generateSku(productName: string, color: string, size: string): string {
-  const clean = (s: string) =>
-    s
-      .toUpperCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^A-Z0-9]/g, "")
-      .slice(0, 6);
-  return `${clean(productName)}-${clean(color)}-${size}`;
-}
-
 export function VariantForm({
   productId,
-  productName,
+  productName: _productName,
 }: {
   productId: string;
   productName: string;
 }) {
   const action = createVariantAction.bind(null, productId);
-  const [state, formAction, isPending] = [{ error: undefined }, action, false];
   const [formState, boundAction] = useFormState(action, {});
 
   return (

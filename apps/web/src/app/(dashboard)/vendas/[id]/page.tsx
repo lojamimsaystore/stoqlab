@@ -4,22 +4,42 @@ import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { formatCurrency, formatDate } from "@stoqlab/utils";
+import { Receipt } from "./receipt";
+import { AutoPrint } from "./auto-print";
 
 const PAYMENT_LABELS: Record<string, string> = {
   cash: "Dinheiro", pix: "Pix", debit: "Cartão de débito",
   credit: "Cartão de crédito", installment: "Parcelado",
 };
 
-export default async function VendaDetailPage({ params }: { params: { id: string } }) {
+export default async function VendaDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: Promise<{ print?: string }>;
+}) {
+  const { print } = await searchParams;
   const tenantId = await getTenantId();
 
-  const { data: sale } = await supabaseAdmin
-    .from("sales")
-    .select("id, status, payment_method, channel, total_value, discount_value, gross_margin, notes, sold_at")
-    .eq("id", params.id)
-    .eq("tenant_id", tenantId)
-    .is("deleted_at", null)
-    .single();
+  const [{ data: sale }, { data: tenant }] = await Promise.all([
+    supabaseAdmin
+      .from("sales")
+      .select(`
+        id, status, payment_method, channel, total_value, discount_value, gross_margin, notes, sold_at,
+        locations(name),
+        customers(name)
+      `)
+      .eq("id", params.id)
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .single(),
+    supabaseAdmin
+      .from("tenants")
+      .select("name")
+      .eq("id", tenantId)
+      .single(),
+  ]);
 
   if (!sale) notFound();
 
@@ -28,14 +48,32 @@ export default async function VendaDetailPage({ params }: { params: { id: string
     .select("id, quantity, sale_price, discount, final_price, product_variants(color, size, sku, products(name))")
     .eq("sale_id", params.id);
 
+  const location = sale.locations as { name: string } | null;
+  const customer = sale.customers as { name: string } | null;
+
+  const receiptItems = (items ?? []).map((item) => {
+    const v = item.product_variants as { color: string; size: string; products: { name: string } | null } | null;
+    return {
+      productName: v?.products?.name ?? "—",
+      color: v?.color ?? "",
+      size: v?.size ?? "",
+      quantity: item.quantity,
+      salePrice: Number(item.sale_price),
+      finalPrice: Number(item.final_price),
+    };
+  });
+
   return (
     <div className="space-y-6 max-w-2xl">
-      <Link href="/vendas" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+      {print === "1" && <AutoPrint />}
+
+      <Link href="/vendas" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors print:hidden">
         <ArrowLeft size={15} />
         Voltar
       </Link>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      {/* Resumo da venda */}
+      <div className={`bg-white rounded-xl border border-slate-200 p-5 ${print === "1" ? "hidden" : "print:hidden"}`}>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
           <div>
             <p className="text-xs text-slate-500">Data</p>
@@ -62,7 +100,8 @@ export default async function VendaDetailPage({ params }: { params: { id: string
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      {/* Itens */}
+      <div className={`bg-white rounded-xl border border-slate-200 overflow-hidden ${print === "1" ? "hidden" : "print:hidden"}`}>
         <div className="px-5 py-4 border-b border-slate-100">
           <h2 className="font-semibold text-slate-900">Itens ({items?.length ?? 0})</h2>
         </div>
@@ -94,6 +133,23 @@ export default async function VendaDetailPage({ params }: { params: { id: string
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Comprovante */}
+      <div className="space-y-3">
+        <h2 className="font-semibold text-slate-900 print:hidden">Comprovante</h2>
+        <Receipt
+          tenantName={tenant?.name ?? "Loja"}
+          locationName={location?.name ?? "—"}
+          customerName={customer?.name ?? null}
+          soldAt={sale.sold_at}
+          paymentMethod={sale.payment_method}
+          channel={sale.channel}
+          totalValue={Number(sale.total_value)}
+          discountValue={Number(sale.discount_value)}
+          notes={sale.notes ?? null}
+          items={receiptItems}
+        />
       </div>
     </div>
   );

@@ -36,7 +36,7 @@ export default async function ConfiguracoesPage() {
         <p className="text-sm text-slate-500 mt-1">Gerencie sua loja, conta e equipe.</p>
       </div>
       <SettingsTabs
-        tenant={{ ...tenant!, settings: (tenant?.settings as Record<string, string>) ?? {} }}
+        tenant={{ ...tenant!, settings: (tenant?.settings as Record<string, unknown>) ?? {} }}
         user={{ id: authUser.id, name: userProfile?.name ?? "", email: authUser.email ?? "", role: userProfile?.role ?? "seller" }}
         locations={locations ?? []}
         users={usersWithEmail}

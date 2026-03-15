@@ -9,6 +9,7 @@ import {
   TrendingDown,
   Tag,
   Activity,
+  BarChart2,
 } from "lucide-react";
 import { formatCurrency } from "@stoqlab/utils";
 
@@ -61,11 +62,11 @@ async function getDashboardData(tenantId: string) {
 
       supabaseAdmin
         .from("sales")
-        .select("id, total_value, gross_margin, sold_at, payment_method")
+        .select("id, total_value, gross_margin, sold_at, payment_method, channel, customers(name)")
         .eq("tenant_id", tenantId)
         .eq("status", "completed")
         .order("sold_at", { ascending: false })
-        .limit(8),
+        .limit(10),
     ]);
 
   const totalMes = (vendasMes.data ?? []).reduce((sum, v) => sum + Number(v.total_value), 0);
@@ -179,10 +180,9 @@ export default async function DashboardPage() {
                       {Math.abs(data.variacaoMes).toFixed(1)}% vs mês anterior
                     </span>
                   </>
-                ) : (
-                  <span className="text-xs text-slate-400">{data.qtdVendasMes} vendas</span>
-                )}
+                ) : null}
               </div>
+              <p className="text-xs text-slate-400 mt-0.5">{data.qtdVendasMes} venda{data.qtdVendasMes !== 1 ? "s" : ""} no mês</p>
             </div>
             <div className="p-2.5 rounded-xl bg-blue-50 shrink-0 ml-3">
               <TrendingUp size={20} className="text-blue-600" />
@@ -269,6 +269,7 @@ export default async function DashboardPage() {
           <div className="divide-y divide-slate-100">
             {data.ultimasVendas.map((venda) => {
               const margin = Number(venda.gross_margin);
+              const customer = (venda.customers as unknown as Array<{ name: string }> | null)?.[0] ?? null;
               return (
                 <Link
                   key={venda.id}
@@ -281,9 +282,11 @@ export default async function DashboardPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-slate-900">
-                        {PAYMENT_LABELS[venda.payment_method] ?? venda.payment_method}
+                        {customer?.name ?? PAYMENT_LABELS[venda.payment_method] ?? venda.payment_method}
                       </p>
                       <p className="text-xs text-slate-400">
+                        {PAYMENT_LABELS[venda.payment_method] ?? venda.payment_method}
+                        {" · "}
                         {new Date(venda.sold_at).toLocaleDateString("pt-BR", {
                           day: "2-digit",
                           month: "short",
@@ -309,11 +312,12 @@ export default async function DashboardPage() {
       </div>
 
       {/* Atalhos rápidos */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { href: "/compras/nova", label: "Nova compra", icon: ShoppingCart, color: "text-blue-600 bg-blue-50" },
           { href: "/vendas/nova", label: "Nova venda", icon: Tag, color: "text-emerald-600 bg-emerald-50" },
           { href: "/estoque", label: "Ver estoque", icon: Package, color: "text-orange-600 bg-orange-50" },
+          { href: "/relatorios", label: "Relatórios", icon: BarChart2, color: "text-purple-600 bg-purple-50" },
         ].map((item) => (
           <Link
             key={item.href}

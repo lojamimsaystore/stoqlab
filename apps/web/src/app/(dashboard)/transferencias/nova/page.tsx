@@ -17,18 +17,31 @@ export default async function NovaTransferenciaPage() {
       .order("name"),
     supabaseAdmin
       .from("product_variants")
-      .select(`id, color, size, sku, products!inner(name), inventory(quantity, location_id)`)
+      .select(`id, color, color_hex, size, sku, products!inner(id, name, cover_image_url), inventory(quantity, location_id)`)
       .eq("tenant_id", tenantId)
       .is("deleted_at", null),
   ]);
 
-  const variants = (inventoryRows ?? []).map((v) => {
-    const product = v.products as { name: string } | null;
+  // Agrupa variantes por produto
+  type ProductMap = {
+    id: string; name: string; imageUrl: string | null;
+    variants: { id: string; color: string; colorHex: string | null; size: string; sku: string; stock: Record<string, number> }[];
+  };
+  const productsMap = new Map<string, ProductMap>();
+  for (const v of inventoryRows ?? []) {
+    const product = v.products as { id: string; name: string; cover_image_url: string | null } | null;
+    if (!product) continue;
+    if (!productsMap.has(product.id)) {
+      productsMap.set(product.id, { id: product.id, name: product.name, imageUrl: product.cover_image_url, variants: [] });
+    }
     const invList = v.inventory as { quantity: number; location_id: string }[];
     const stock: Record<string, number> = {};
     for (const inv of invList ?? []) stock[inv.location_id] = inv.quantity;
-    return { id: v.id, color: v.color, size: v.size, sku: v.sku ?? "", productName: product?.name ?? "—", stock };
-  }).sort((a, b) => a.productName.localeCompare(b.productName));
+    productsMap.get(product.id)!.variants.push({
+      id: v.id, color: v.color, colorHex: v.color_hex ?? null, size: v.size, sku: v.sku ?? "", stock,
+    });
+  }
+  const products = [...productsMap.values()].sort((a, b) => a.name.localeCompare(b.name));
 
   if ((locations ?? []).length < 2) {
     return (
@@ -56,9 +69,7 @@ export default async function NovaTransferenciaPage() {
         <h1 className="text-xl font-semibold text-slate-900">Nova transferência</h1>
         <p className="text-sm text-slate-500 mt-1">Mova estoque entre lojas ou depósitos.</p>
       </div>
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <TransferForm locations={locations ?? []} variants={variants} />
-      </div>
+      <TransferForm locations={locations ?? []} products={products} />
     </div>
   );
 }

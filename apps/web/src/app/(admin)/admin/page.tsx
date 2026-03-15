@@ -23,14 +23,18 @@ export default async function AdminPage() {
     emailMap[u.id] = u.email ?? "";
   }
 
-  // Count users per tenant + find owner
+  // Count users per tenant + find owner + list employees
   const userCountMap: Record<string, number> = {};
   const ownerMap: Record<string, { name: string; email: string }> = {};
+  const employeesMap: Record<string, { name: string; role: string }[]> = {};
   for (const u of users ?? []) {
     if (!u.tenant_id) continue;
     userCountMap[u.tenant_id] = (userCountMap[u.tenant_id] ?? 0) + 1;
     if (u.role === "owner") {
       ownerMap[u.tenant_id] = { name: u.name, email: emailMap[u.id] ?? "" };
+    } else {
+      if (!employeesMap[u.tenant_id]) employeesMap[u.tenant_id] = [];
+      employeesMap[u.tenant_id].push({ name: u.name, role: u.role });
     }
   }
 
@@ -39,6 +43,7 @@ export default async function AdminPage() {
     is_active: t.is_active ?? true,
     user_count: userCountMap[t.id] ?? 0,
     owner: ownerMap[t.id] ?? null,
+    employees: employeesMap[t.id] ?? [],
   }));
 
   // Stats

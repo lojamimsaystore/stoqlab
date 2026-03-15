@@ -4,9 +4,8 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Todos os status" },
-  { value: "draft", label: "Rascunho" },
-  { value: "confirmed", label: "Confirmada" },
   { value: "received", label: "Recebida" },
+  { value: "confirmed", label: "Em andamento" },
   { value: "cancelled", label: "Cancelada" },
 ];
 

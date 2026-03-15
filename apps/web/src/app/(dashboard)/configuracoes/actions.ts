@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
+import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
@@ -19,15 +19,66 @@ export async function updateTenantAction(
 
   if (!name) return { error: "Nome obrigatório" };
 
+  const { data: existing } = await supabaseAdmin
+    .from("tenants")
+    .select("settings")
+    .eq("id", tenantId)
+    .single();
+  const existingSettings = (existing?.settings as Record<string, unknown>) ?? {};
+
   const { error } = await supabaseAdmin
     .from("tenants")
-    .update({ name, settings: { phone, address } })
+    .update({ name, settings: { ...existingSettings, phone, address } })
     .eq("id", tenantId);
 
   if (error) return { error: "Erro ao atualizar dados da loja." };
 
   revalidatePath("/configuracoes");
   revalidatePath("/");
+  return { success: true };
+}
+
+// ─── Informações (preferências + permissões) ──────────────────
+
+export async function updateInformacoesAction(
+  _prev: { error?: string; success?: boolean },
+  formData: FormData
+): Promise<{ error?: string; success?: boolean }> {
+  const tenantId = await getTenantId();
+
+  const rawThreshold = parseInt(formData.get("low_stock_threshold") as string, 10);
+  const low_stock_threshold = Number.isFinite(rawThreshold)
+    ? Math.max(1, Math.min(99, rawThreshold))
+    : 5;
+
+  const roles = ["manager", "seller", "stock_operator"] as const;
+  const moduleKeys = [
+    "dashboard", "produtos", "categorias", "estoque", "compras",
+    "vendas", "transferencias", "fornecedores", "clientes", "relatorios", "configuracoes",
+  ];
+
+  const role_permissions: Record<string, string[]> = {};
+  for (const role of roles) {
+    role_permissions[role] = moduleKeys.filter(
+      (m) => formData.get(`perm_${role}_${m}`) === "1"
+    );
+  }
+
+  const { data: existing } = await supabaseAdmin
+    .from("tenants")
+    .select("settings")
+    .eq("id", tenantId)
+    .single();
+  const existingSettings = (existing?.settings as Record<string, unknown>) ?? {};
+
+  const { error } = await supabaseAdmin
+    .from("tenants")
+    .update({ settings: { ...existingSettings, low_stock_threshold, role_permissions } })
+    .eq("id", tenantId);
+
+  if (error) return { error: "Erro ao salvar informações." };
+
+  revalidatePath("/", "layout");
   return { success: true };
 }
 
@@ -95,6 +146,28 @@ export async function createLocationAction(
   return {};
 }
 
+export async function updateLocationAction(
+  id: string,
+  name: string,
+  type: string,
+): Promise<{ error?: string }> {
+  const tenantId = await getTenantId();
+  const trimmed = name.trim();
+  if (!trimmed) return { error: "Nome obrigatório" };
+
+  const { error } = await supabaseAdmin
+    .from("locations")
+    .update({ name: trimmed, type })
+    .eq("id", id)
+    .eq("tenant_id", tenantId);
+
+  if (error) return { error: "Erro ao atualizar localização." };
+
+  revalidatePath("/configuracoes");
+  revalidatePath("/transferencias");
+  return {};
+}
+
 export async function deleteLocationAction(id: string): Promise<void> {
   const tenantId = await getTenantId();
   await supabaseAdmin
@@ -124,25 +197,39 @@ export async function inviteUserAction(
   if (!email || !name) return { error: "Nome e e-mail obrigatórios." };
   if (!VALID_ROLES.includes(role as typeof VALID_ROLES[number])) return { error: "Perfil inválido." };
 
-  // Cria usuário no Supabase Auth
-  const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+  // Monta URL de redirecionamento dinamicamente
+  const headersList = await headers();
+  const host = headersList.get("host") ?? "localhost:3000";
+  const proto = headersList.get("x-forwarded-proto") ?? "http";
+  const appUrl = `${proto}://${host}`;
+
+  // Envia convite — o Supabase dispara o e-mail automaticamente
+  const { data: inviteData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
     email,
-    email_confirm: true,
-    password: Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(36)).join("").slice(0, 16) + "A1!",
-  });
+    { redirectTo: `${appUrl}/auth/callback?next=/convite` }
+  );
 
   if (authError) {
-    if (authError.message.includes("already")) return { error: "Este e-mail já está cadastrado." };
-    return { error: "Erro ao criar usuário." };
+    if (authError.message.toLowerCase().includes("already")) return { error: "Este e-mail já está cadastrado." };
+    return { error: "Erro ao enviar convite." };
   }
 
-  await supabaseAdmin.from("users").insert({
-    id: authUser.user.id,
-    tenant_id: tenantId,
-    name,
-    role,
-    is_active: true,
-  });
+  // Verifica se já existe registro na tabela users (reenvio de convite)
+  const { data: existing } = await supabaseAdmin
+    .from("users")
+    .select("id")
+    .eq("id", inviteData.user.id)
+    .single();
+
+  if (!existing) {
+    await supabaseAdmin.from("users").insert({
+      id: inviteData.user.id,
+      tenant_id: tenantId,
+      name,
+      role,
+      is_active: true,
+    });
+  }
 
   revalidatePath("/configuracoes");
   return { success: true };

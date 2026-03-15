@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit";
 
 const itemSchema = z.object({
   variantId: z.string().uuid(),
@@ -208,7 +209,14 @@ export async function deleteTransferAction(
     }
   }
 
-  // Remove movimentos de estoque, itens e transferência
+  await writeAuditLog({
+    tenantId,
+    action: "transfer.deleted",
+    tableName: "stock_transfers",
+    recordId: transferId,
+    oldData: { ...transfer, items } as unknown as Record<string, unknown>,
+  });
+
   await supabaseAdmin.from("inventory_movements").delete().eq("reference_id", transferId);
   await supabaseAdmin.from("transfer_items").delete().eq("transfer_id", transferId);
   await supabaseAdmin.from("stock_transfers").delete().eq("id", transferId);

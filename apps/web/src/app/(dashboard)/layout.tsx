@@ -43,6 +43,8 @@ export default async function DashboardLayout({
   let lowStockItems: LowStockItem[] = [];
   let lowStockThreshold = 5;
   let userPermissions: string[] = resolvePermissions(userRole, null);
+  let sidebarColor: string | undefined;
+  let sidebarFontColor: string | undefined;
 
   if (profile?.tenant_id) {
     const [{ data: tenantData }, { data: invData }] = await Promise.all([
@@ -63,6 +65,8 @@ export default async function DashboardLayout({
 
     const savedRolePerms = settings.role_permissions as Record<string, string[]> | undefined;
     userPermissions = resolvePermissions(userRole, savedRolePerms);
+    sidebarColor = typeof settings.sidebar_color === "string" ? settings.sidebar_color : undefined;
+    sidebarFontColor = typeof settings.sidebar_font_color === "string" ? settings.sidebar_font_color : undefined;
 
     lowStockItems = (invData ?? [])
       .filter((row) => row.quantity <= lowStockThreshold)
@@ -90,6 +94,8 @@ export default async function DashboardLayout({
       lowStockItems={lowStockItems}
       lowStockThreshold={lowStockThreshold}
       userPermissions={userPermissions}
+      sidebarColor={sidebarColor}
+      sidebarFontColor={sidebarFontColor}
     >
       {children}
     </DashboardShell>

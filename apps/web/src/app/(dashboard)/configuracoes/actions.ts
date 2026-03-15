@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit";
 
 // ─── Dados da loja ────────────────────────────────────────────
 
@@ -155,6 +156,13 @@ export async function updateLocationAction(
   const trimmed = name.trim();
   if (!trimmed) return { error: "Nome obrigatório" };
 
+  const { data: before } = await supabaseAdmin
+    .from("locations")
+    .select("id, name, type")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .single();
+
   const { error } = await supabaseAdmin
     .from("locations")
     .update({ name: trimmed, type })
@@ -162,6 +170,15 @@ export async function updateLocationAction(
     .eq("tenant_id", tenantId);
 
   if (error) return { error: "Erro ao atualizar localização." };
+
+  await writeAuditLog({
+    tenantId,
+    action: "location.updated",
+    tableName: "locations",
+    recordId: id,
+    oldData: before as unknown as Record<string, unknown>,
+    newData: { name: trimmed, type },
+  });
 
   revalidatePath("/configuracoes");
   revalidatePath("/transferencias");
@@ -171,7 +188,6 @@ export async function updateLocationAction(
 export async function deleteLocationAction(id: string): Promise<{ error?: string }> {
   const tenantId = await getTenantId();
 
-  // Verifica se há estoque vinculado a esta localização
   const { data: inventoryItems } = await supabaseAdmin
     .from("inventory")
     .select("id, quantity")
@@ -183,6 +199,13 @@ export async function deleteLocationAction(id: string): Promise<{ error?: string
     return { error: "Esta localização possui estoque. Transfira ou zere o estoque antes de excluir." };
   }
 
+  const { data: location } = await supabaseAdmin
+    .from("locations")
+    .select("*")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .single();
+
   const { error } = await supabaseAdmin
     .from("locations")
     .update({ deleted_at: new Date().toISOString() })
@@ -190,6 +213,14 @@ export async function deleteLocationAction(id: string): Promise<{ error?: string
     .eq("tenant_id", tenantId);
 
   if (error) return { error: "Erro ao remover localização." };
+
+  await writeAuditLog({
+    tenantId,
+    action: "location.deleted",
+    tableName: "locations",
+    recordId: id,
+    oldData: location as unknown as Record<string, unknown>,
+  });
 
   revalidatePath("/configuracoes");
   revalidatePath("/transferencias");
@@ -255,22 +286,47 @@ export async function updateUserRoleAction(id: string, role: string): Promise<vo
   const tenantId = await getTenantId();
   if (!VALID_ROLES.includes(role as typeof VALID_ROLES[number])) return;
 
+  const { data: before } = await supabaseAdmin
+    .from("users")
+    .select("id, role, name")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .single();
+
   await supabaseAdmin
     .from("users")
     .update({ role })
     .eq("id", id)
     .eq("tenant_id", tenantId);
 
+  await writeAuditLog({
+    tenantId,
+    action: "user.role_changed",
+    tableName: "users",
+    recordId: id,
+    oldData: before as unknown as Record<string, unknown>,
+    newData: { role },
+  });
+
   revalidatePath("/configuracoes");
 }
 
 export async function toggleUserActiveAction(id: string, active: boolean): Promise<void> {
   const tenantId = await getTenantId();
+
   await supabaseAdmin
     .from("users")
     .update({ is_active: active })
     .eq("id", id)
     .eq("tenant_id", tenantId);
+
+  await writeAuditLog({
+    tenantId,
+    action: active ? "user.activated" : "user.deactivated",
+    tableName: "users",
+    recordId: id,
+    newData: { is_active: active },
+  });
 
   revalidatePath("/configuracoes");
 }

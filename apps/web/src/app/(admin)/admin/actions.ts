@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/service";
+import { writeAuditLog } from "@/lib/audit";
 
 const VALID_PLANS = ["trial", "starter", "pro", "enterprise", "vitalicio"] as const;
 
@@ -34,6 +35,12 @@ export async function changeTenantPlanAction(
     return { error: "Plano inválido" };
   }
 
+  const { data: before } = await supabaseAdmin
+    .from("tenants")
+    .select("id, plan, name")
+    .eq("id", tenantId)
+    .single();
+
   const { error } = await supabaseAdmin
     .from("tenants")
     .update({
@@ -43,6 +50,15 @@ export async function changeTenantPlanAction(
     .eq("id", tenantId);
 
   if (error) return { error: "Erro ao atualizar plano." };
+
+  await writeAuditLog({
+    tenantId,
+    action: "tenant.plan_changed",
+    tableName: "tenants",
+    recordId: tenantId,
+    oldData: before as unknown as Record<string, unknown>,
+    newData: { plan },
+  });
 
   revalidatePath("/admin");
   return {};
@@ -70,7 +86,21 @@ export async function deleteTenantAction(
     }
   }
 
-  // 3. Soft delete no tenant (public.users são deletados em cascata ou pelo trigger)
+  const { data: tenant } = await supabaseAdmin
+    .from("tenants")
+    .select("*")
+    .eq("id", tenantId)
+    .single();
+
+  await writeAuditLog({
+    tenantId,
+    action: "tenant.deleted",
+    tableName: "tenants",
+    recordId: tenantId,
+    oldData: { ...tenant, deleted_users: tenantUsers } as unknown as Record<string, unknown>,
+  });
+
+  // 3. Soft delete no tenant
   const { error } = await supabaseAdmin
     .from("tenants")
     .update({ deleted_at: new Date().toISOString() })
@@ -98,6 +128,14 @@ export async function toggleTenantActiveAction(
     .eq("id", tenantId);
 
   if (error) return { error: "Erro ao atualizar status." };
+
+  await writeAuditLog({
+    tenantId,
+    action: active ? "tenant.activated" : "tenant.deactivated",
+    tableName: "tenants",
+    recordId: tenantId,
+    newData: { is_active: active },
+  });
 
   revalidatePath("/admin");
   return {};

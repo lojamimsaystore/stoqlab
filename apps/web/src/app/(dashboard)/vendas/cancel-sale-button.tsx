@@ -24,9 +24,14 @@ export function CancelSaleButton({ id }: { id: string }) {
 
   function handleConfirm() {
     startTransition(async () => {
-      await cancelSaleAction(id);
-      toast.success("Venda cancelada com sucesso");
+      const result = await cancelSaleAction(id);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Venda excluída e estoque revertido");
       setOpen(false);
+      router.push("/vendas");
       router.refresh();
     });
   }
@@ -35,15 +40,14 @@ export function CancelSaleButton({ id }: { id: string }) {
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
         <button className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors">
-          Cancelar
+          Excluir
         </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Cancelar venda?</AlertDialogTitle>
+          <AlertDialogTitle>Excluir venda?</AlertDialogTitle>
           <AlertDialogDescription>
-            Esta venda será marcada como cancelada. Atenção: o estoque não será revertido
-            automaticamente.
+            A venda será removida permanentemente e o estoque dos itens será revertido automaticamente. Esta ação não pode ser desfeita.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

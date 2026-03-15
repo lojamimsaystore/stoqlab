@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { createProductFullSchema, variantSchema } from "@stoqlab/validators";
+import { writeAuditLog } from "@/lib/audit";
 
 // ─── Helper: garante que existe uma localização padrão ───────
 
@@ -228,15 +229,31 @@ export async function toggleProductArchiveAction(
     .update({ status: newStatus })
     .eq("id", id)
     .eq("tenant_id", tenantId);
+
+  await writeAuditLog({
+    tenantId,
+    action: newStatus === "archived" ? "product.archived" : "product.restored",
+    tableName: "products",
+    recordId: id,
+    oldData: { status: currentStatus },
+    newData: { status: newStatus },
+  });
+
   revalidatePath("/produtos");
 }
 
 // ─── Excluir produto ──────────────────────────────────────────
 
-export async function deleteProductAction(id: string) {
+export async function deleteProductAction(id: string): Promise<{ error?: string }> {
   const tenantId = await getTenantId();
 
-  // Buscar IDs das variações para limpar filhos sem cascade
+  const { data: product } = await supabaseAdmin
+    .from("products")
+    .select("*")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .single();
+
   const { data: variants } = await supabaseAdmin
     .from("product_variants")
     .select("id")
@@ -245,17 +262,39 @@ export async function deleteProductAction(id: string) {
 
   const variantIds = variants?.map((v) => v.id) ?? [];
 
+  // Verifica se há vendas ou compras vinculadas
   if (variantIds.length > 0) {
-    // inventory_movements não tem cascade — deletar primeiro
+    const [{ data: saleItems }, { data: purchaseItems }, { data: transferItems }] = await Promise.all([
+      supabaseAdmin.from("sale_items").select("id").in("variant_id", variantIds).limit(1),
+      supabaseAdmin.from("purchase_items").select("id").in("variant_id", variantIds).limit(1),
+      supabaseAdmin.from("transfer_items").select("id").in("variant_id", variantIds).limit(1),
+    ]);
+
+    if (saleItems?.length || purchaseItems?.length || transferItems?.length) {
+      return { error: "Este produto possui vendas, compras ou transferências vinculadas e não pode ser excluído. Use a opção de arquivar." };
+    }
+  }
+
+  await writeAuditLog({
+    tenantId,
+    action: "product.deleted",
+    tableName: "products",
+    recordId: id,
+    oldData: product as unknown as Record<string, unknown>,
+  });
+
+  if (variantIds.length > 0) {
     await supabaseAdmin.from("inventory_movements").delete().in("variant_id", variantIds);
     await supabaseAdmin.from("inventory").delete().in("variant_id", variantIds);
     await supabaseAdmin.from("product_variants").delete().in("id", variantIds);
   }
 
-  await supabaseAdmin.from("products").delete().eq("id", id).eq("tenant_id", tenantId);
+  const { error } = await supabaseAdmin.from("products").delete().eq("id", id).eq("tenant_id", tenantId);
+  if (error) return { error: "Erro ao excluir produto." };
 
   revalidatePath("/produtos");
   revalidatePath("/estoque");
+  return {};
 }
 
 // ─── Criar variação adicional ─────────────────────────────────
@@ -482,15 +521,24 @@ export async function cleanOrphanVariantsAction(): Promise<void> {
 export async function deleteVariantAction(id: string, productId: string) {
   const tenantId = await getTenantId();
 
-  // inventory_movements não tem cascade — deletar primeiro
+  const { data: variant } = await supabaseAdmin
+    .from("product_variants")
+    .select("*")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  await writeAuditLog({
+    tenantId,
+    action: "variant.deleted",
+    tableName: "product_variants",
+    recordId: id,
+    oldData: variant as unknown as Record<string, unknown>,
+  });
+
   await supabaseAdmin.from("inventory_movements").delete().eq("variant_id", id);
   await supabaseAdmin.from("inventory").delete().eq("variant_id", id);
-
-  await supabaseAdmin
-    .from("product_variants")
-    .delete()
-    .eq("id", id)
-    .eq("tenant_id", tenantId);
+  await supabaseAdmin.from("product_variants").delete().eq("id", id).eq("tenant_id", tenantId);
 
   revalidatePath(`/produtos/${productId}`);
 }

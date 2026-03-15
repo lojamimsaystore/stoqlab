@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useTransition } from "react";
 import {
   LayoutDashboard,
   Package,
@@ -12,20 +13,20 @@ import {
   Truck,
   Users,
   BarChart3,
-  Settings,
-  LogOut,
   X,
   FolderOpen,
   PanelLeftClose,
   PanelLeftOpen,
+  Palette,
 } from "lucide-react";
-import { logoutAction } from "@/app/(dashboard)/actions";
+import { updateSidebarColorAction, updateSidebarFontColorAction } from "@/app/(dashboard)/actions";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -38,7 +39,6 @@ const NAV_ITEMS = [
   { href: "/fornecedores", label: "Fornecedores", icon: Truck },
   { href: "/clientes", label: "Clientes", icon: Users },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
-  { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 type SidebarProps = {
@@ -50,13 +50,28 @@ type SidebarProps = {
   onToggleCollapse: () => void;
   userPermissions?: string[];
   userRole?: string;
+  sidebarColor?: string;
+  sidebarFontColor?: string;
 };
 
 export function Sidebar({
   open, onClose, tenantName, userName, collapsed, onToggleCollapse,
-  userPermissions = [], userRole = "owner",
+  userPermissions = [], userRole = "owner", sidebarColor, sidebarFontColor,
 }: SidebarProps) {
   const pathname = usePathname();
+  const [currentColor, setCurrentColor] = useState(sidebarColor ?? "#0f172a");
+  const [currentFontColor, setCurrentFontColor] = useState(sidebarFontColor ?? "#ffffff");
+  const [isPending, startTransition] = useTransition();
+
+  function handleColorSelect(hex: string) {
+    setCurrentColor(hex);
+    startTransition(() => updateSidebarColorAction(hex));
+  }
+
+  function handleFontColorSelect(hex: string) {
+    setCurrentFontColor(hex);
+    startTransition(() => updateSidebarFontColorAction(hex));
+  }
 
   const visibleItems = NAV_ITEMS.filter(({ href }) => {
     if (userRole === "owner" || userRole === "master") return true;
@@ -76,8 +91,9 @@ export function Sidebar({
       )}
 
       <aside
+        style={{ backgroundColor: currentColor, color: currentFontColor }}
         className={`
-          fixed inset-y-0 left-0 z-30 bg-slate-900 text-white flex flex-col
+          fixed inset-y-0 left-0 z-30 text-white flex flex-col
           transform transition-all duration-200 ease-in-out
           lg:relative lg:translate-x-0 lg:z-auto
           print:hidden
@@ -132,9 +148,10 @@ export function Sidebar({
                       href={href}
                       onClick={onClose}
                       aria-label={label}
+                      style={!active ? { color: currentFontColor } : undefined}
                       className={`
                         flex items-center justify-center w-full h-10 rounded-lg transition-colors
-                        ${active ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"}
+                        ${active ? "bg-blue-600 text-white" : "hover:bg-white/10"}
                       `}
                     >
                       <Icon size={18} className="shrink-0" />
@@ -152,9 +169,10 @@ export function Sidebar({
                 key={href}
                 href={href}
                 onClick={onClose}
+                style={!active ? { color: currentFontColor } : undefined}
                 className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                  ${active ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white"}
+                  ${active ? "bg-blue-600 text-white" : "hover:bg-white/10"}
                 `}
               >
                 <Icon size={18} className="shrink-0" />
@@ -166,38 +184,50 @@ export function Sidebar({
         </nav>
 
         {/* Footer */}
-        <div className="px-2 py-3 border-t border-slate-800 space-y-0.5">
+        <div className="px-2 py-3 border-t border-white/10">
           {!collapsed && (
             <div className="px-3 py-2 mb-1">
               <p className="text-sm font-medium text-white truncate">{userName}</p>
             </div>
           )}
 
+          {/* Seletores de cor */}
           {collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <form action={logoutAction} className="w-full">
-                  <button
-                    type="submit"
-                    aria-label="Sair"
-                    className="flex w-full items-center justify-center h-10 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
-                  >
-                    <LogOut size={18} className="shrink-0" />
-                  </button>
-                </form>
-              </TooltipTrigger>
-              <TooltipContent side="right">Sair</TooltipContent>
-            </Tooltip>
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <label className="flex w-full items-center justify-center h-10 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" style={{ color: currentFontColor + "99" }}>
+                    <Palette size={18} />
+                    <input type="color" value={currentColor} onChange={(e) => handleColorSelect(e.target.value)} className="sr-only" />
+                  </label>
+                </TooltipTrigger>
+                <TooltipContent side="right">Cor da barra lateral</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <label className="flex w-full items-center justify-center h-10 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" style={{ color: currentFontColor + "99" }}>
+                    <span className="text-xs font-bold">A</span>
+                    <input type="color" value={currentFontColor} onChange={(e) => handleFontColorSelect(e.target.value)} className="sr-only" />
+                  </label>
+                </TooltipTrigger>
+                <TooltipContent side="right">Cor da fonte</TooltipContent>
+              </Tooltip>
+            </>
           ) : (
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
-              >
-                <LogOut size={18} className="shrink-0" />
-                Sair
-              </button>
-            </form>
+            <>
+              <label className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors cursor-pointer" style={{ color: currentFontColor + "99" }}>
+                <Palette size={16} className="shrink-0" />
+                <span>Cor da barra</span>
+                <span className="ml-auto w-4 h-4 rounded-full border-2 border-white/30 shrink-0" style={{ backgroundColor: currentColor }} />
+                <input type="color" value={currentColor} onChange={(e) => handleColorSelect(e.target.value)} className="sr-only" />
+              </label>
+              <label className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors cursor-pointer" style={{ color: currentFontColor + "99" }}>
+                <span className="text-base font-bold shrink-0">A</span>
+                <span>Cor da fonte</span>
+                <span className="ml-auto w-4 h-4 rounded-full border-2 border-white/30 shrink-0" style={{ backgroundColor: currentFontColor }} />
+                <input type="color" value={currentFontColor} onChange={(e) => handleFontColorSelect(e.target.value)} className="sr-only" />
+              </label>
+            </>
           )}
         </div>
       </aside>

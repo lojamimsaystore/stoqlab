@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit";
 
 const customerSchema = z.object({
   name: z.string().min(1, "Nome obrigatório").max(150),
@@ -75,6 +76,22 @@ export async function updateCustomerAction(
 
 export async function deleteCustomerAction(id: string): Promise<void> {
   const tenantId = await getTenantId();
+
+  const { data: customer } = await supabaseAdmin
+    .from("customers")
+    .select("*")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  await writeAuditLog({
+    tenantId,
+    action: "customer.deleted",
+    tableName: "customers",
+    recordId: id,
+    oldData: customer as unknown as Record<string, unknown>,
+  });
+
   await supabaseAdmin
     .from("customers")
     .delete()

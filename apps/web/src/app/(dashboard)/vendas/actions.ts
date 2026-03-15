@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit";
 
 export type CustomerResult = {
   id: string;
@@ -249,13 +250,53 @@ export async function searchCustomersAction(query: string): Promise<CustomerResu
   return (data ?? []) as CustomerResult[];
 }
 
-export async function cancelSaleAction(id: string): Promise<void> {
+export async function cancelSaleAction(id: string): Promise<{ error?: string }> {
   const tenantId = await getTenantId();
-  await supabaseAdmin
+
+  // Busca a venda completa antes de deletar (para o log)
+  const { data: sale } = await supabaseAdmin
     .from("sales")
-    .update({ status: "cancelled", deleted_at: new Date().toISOString() })
+    .select("*, sale_items(variant_id, quantity, sale_price, discount)")
     .eq("id", id)
-    .eq("tenant_id", tenantId);
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (!sale) return { error: "Venda não encontrada." };
+
+  const items = sale.sale_items as { variant_id: string; quantity: number; sale_price: string; discount: string }[];
+
+  // Reverte estoque de cada item
+  for (const item of items ?? []) {
+    const { data: inv } = await supabaseAdmin
+      .from("inventory")
+      .select("id, quantity")
+      .eq("variant_id", item.variant_id)
+      .eq("location_id", (sale as unknown as { location_id: string }).location_id)
+      .single();
+
+    if (inv) {
+      await supabaseAdmin
+        .from("inventory")
+        .update({ quantity: inv.quantity + item.quantity })
+        .eq("id", inv.id);
+    }
+  }
+
+  // Registra no audit_log antes de deletar
+  await writeAuditLog({
+    tenantId,
+    action: "sale.deleted",
+    tableName: "sales",
+    recordId: id,
+    oldData: sale as unknown as Record<string, unknown>,
+  });
+
+  // Hard delete — remove itens, movimentos e a venda
+  await supabaseAdmin.from("inventory_movements").delete().eq("reference_id", id);
+  await supabaseAdmin.from("sale_items").delete().eq("sale_id", id);
+  await supabaseAdmin.from("sales").delete().eq("id", id).eq("tenant_id", tenantId);
 
   revalidatePath("/vendas");
+  revalidatePath("/estoque");
+  return {};
 }

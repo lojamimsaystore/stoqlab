@@ -24,6 +24,8 @@ type DashboardShellProps = {
   lowStockItems?: LowStockItem[];
   lowStockThreshold?: number;
   userPermissions?: string[];
+  sidebarColor?: string;
+  sidebarFontColor?: string;
 };
 
 export function DashboardShell({
@@ -35,6 +37,8 @@ export function DashboardShell({
   lowStockItems = [],
   lowStockThreshold = 5,
   userPermissions = [],
+  sidebarColor,
+  sidebarFontColor,
 }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -75,6 +79,8 @@ export function DashboardShell({
         onToggleCollapse={handleToggleCollapse}
         userPermissions={userPermissions}
         userRole={userRole}
+        sidebarColor={sidebarColor}
+        sidebarFontColor={sidebarFontColor}
       />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-200">
         <Header

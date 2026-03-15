@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { formatDate } from "@stoqlab/utils";
 import { AddLocationForm } from "./add-location-form";
+import { DeleteTransferButton } from "./delete-transfer-button";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pendente", in_transit: "Em trânsito", received: "Recebida", cancelled: "Cancelada",
@@ -102,10 +103,13 @@ export default async function TransferenciasPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/transferencias/${t.id}`} title="Ver transferência" aria-label="Ver detalhes da transferência"
-                        className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded inline-flex">
-                        <Eye size={15} />
-                      </Link>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link href={`/transferencias/${t.id}`} title="Ver transferência" aria-label="Ver detalhes da transferência"
+                          className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded inline-flex">
+                          <Eye size={15} />
+                        </Link>
+                        <DeleteTransferButton transferId={t.id} />
+                      </div>
                     </td>
                   </tr>
                 );

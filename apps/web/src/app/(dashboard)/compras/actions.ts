@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit";
 
 const itemSchema = z.object({
   variantId: z.string().uuid(),
@@ -300,6 +301,14 @@ export async function updatePurchaseStatusAction(
   status: "received" | "confirmed" | "cancelled"
 ): Promise<void> {
   const tenantId = await getTenantId();
+
+  const { data: before } = await supabaseAdmin
+    .from("purchases")
+    .select("id, status, invoice_number")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .single();
+
   await supabaseAdmin
     .from("purchases")
     .update({
@@ -308,6 +317,15 @@ export async function updatePurchaseStatusAction(
     })
     .eq("id", id)
     .eq("tenant_id", tenantId);
+
+  await writeAuditLog({
+    tenantId,
+    action: "purchase.status_changed",
+    tableName: "purchases",
+    recordId: id,
+    oldData: before as unknown as Record<string, unknown>,
+    newData: { status },
+  });
 
   revalidatePath("/compras");
 }
@@ -329,17 +347,31 @@ export async function uploadInvoiceAction(
   return { url };
 }
 
-export async function deletePurchaseAction(id: string): Promise<void> {
+export async function deletePurchaseAction(id: string): Promise<{ error?: string }> {
   const tenantId = await getTenantId();
 
-  // Deletar itens antes (purchase_items pode não ter cascade no banco)
-  await supabaseAdmin.from("purchase_items").delete().eq("purchase_id", id);
-
-  await supabaseAdmin
+  const { data: purchase } = await supabaseAdmin
     .from("purchases")
-    .delete()
+    .select("*, purchase_items(variant_id, quantity, unit_cost, real_unit_cost)")
     .eq("id", id)
-    .eq("tenant_id", tenantId);
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (!purchase) return { error: "Compra não encontrada." };
+
+  await writeAuditLog({
+    tenantId,
+    action: "purchase.deleted",
+    tableName: "purchases",
+    recordId: id,
+    oldData: purchase as unknown as Record<string, unknown>,
+  });
+
+  await supabaseAdmin.from("inventory_movements").delete().eq("reference_id", id);
+  await supabaseAdmin.from("purchase_items").delete().eq("purchase_id", id);
+  await supabaseAdmin.from("purchases").delete().eq("id", id).eq("tenant_id", tenantId);
 
   revalidatePath("/compras");
+  revalidatePath("/estoque");
+  return {};
 }

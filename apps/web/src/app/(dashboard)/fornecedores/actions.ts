@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit";
 
 const supplierSchema = z.object({
   name: z.string().min(1, "Nome obrigatório").max(150),
@@ -103,6 +104,22 @@ export async function createSupplierInlineAction(
 
 export async function deleteSupplierAction(id: string): Promise<void> {
   const tenantId = await getTenantId();
+
+  const { data: supplier } = await supabaseAdmin
+    .from("suppliers")
+    .select("*")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  await writeAuditLog({
+    tenantId,
+    action: "supplier.deleted",
+    tableName: "suppliers",
+    recordId: id,
+    oldData: supplier as unknown as Record<string, unknown>,
+  });
+
   await supabaseAdmin
     .from("suppliers")
     .delete()

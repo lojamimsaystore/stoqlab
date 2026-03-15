@@ -179,7 +179,7 @@ export function SaleForm({ variants, locations }: { variants: Variant[]; locatio
     searchRef.current?.focus();
   }
 
-  function addItemFromCatalog(v: typeof locationVariants[number]) {
+  function addItemFromCatalog(v: { id: string; stock: number; productName: string; color: string; colorHex: string | null; size: string; coverImageUrl: string | null; salePrice: number }) {
     setItems((prev) => {
       const existing = prev.find((i) => i.variantId === v.id);
       if (existing) {

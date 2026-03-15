@@ -42,7 +42,7 @@ export default async function CompraDetailPage({ params }: { params: { id: strin
     .eq("purchase_id", params.id);
 
   const total = Number(purchase.products_cost) + Number(purchase.freight_cost) + Number(purchase.other_costs);
-  const supplier = purchase.suppliers as { name: string; phone?: string; email?: string } | null;
+  const supplier = purchase.suppliers as unknown as { name: string; phone?: string; email?: string } | null;
 
   return (
     <div className="space-y-6">

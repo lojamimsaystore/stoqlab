@@ -11,7 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { logoutAction } from "@/app/(dashboard)/actions";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -51,6 +52,13 @@ function getInitials(name: string): string {
 
 export function Header({ onMenuClick, userName, userEmail, userRole, lowStockItems = [], lowStockThreshold = 5 }: HeaderProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const router = useRouter();
+
+  const handleLogout = useCallback(async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+  }, [router]);
   const lowStockCount = lowStockItems.length;
 
   const toggleFullscreen = useCallback(() => {
@@ -199,7 +207,7 @@ export function Header({ onMenuClick, userName, userEmail, userRole, lowStockIte
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="flex items-center gap-2 text-red-600 focus:bg-red-50 focus:text-red-600 cursor-pointer"
-              onSelect={() => logoutAction()}
+              onSelect={handleLogout}
             >
               <LogOut size={14} />
               Sair

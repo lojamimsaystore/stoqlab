@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
-type PendingProduct = { tempId: string; name: string; photoUrl?: string };
+type Category = { id: string; name: string };
+type PendingProduct = { tempId: string; name: string; categoryId?: string };
 
 export function QuickAddProductModal({
   open,
@@ -12,6 +13,7 @@ export function QuickAddProductModal({
   onUpdated,
   defaultName,
   editProduct,
+  categories = [],
 }: {
   open: boolean;
   onClose: () => void;
@@ -19,15 +21,18 @@ export function QuickAddProductModal({
   onUpdated?: (product: PendingProduct) => void;
   defaultName?: string;
   editProduct?: PendingProduct;
+  categories?: Category[];
 }) {
   const isEdit = !!editProduct;
   const [error, setError] = useState("");
   const [nameValue, setNameValue] = useState("");
+  const [categoryId, setCategoryId] = useState("");
 
   useEffect(() => {
     if (open) {
       setError("");
       setNameValue(isEdit ? (editProduct?.name ?? "") : (defaultName?.toUpperCase() ?? ""));
+      setCategoryId(isEdit ? (editProduct?.categoryId ?? "") : "");
     }
   }, [open, isEdit, editProduct, defaultName]);
 
@@ -38,10 +43,16 @@ export function QuickAddProductModal({
     const name = nameValue.trim();
     if (!name) { setError("Nome obrigatório."); return; }
 
-    if (isEdit && editProduct) {
-      onUpdated?.({ ...editProduct, name });
+    const product: PendingProduct = {
+      tempId: isEdit ? editProduct!.tempId : crypto.randomUUID(),
+      name,
+      categoryId: categoryId || undefined,
+    };
+
+    if (isEdit) {
+      onUpdated?.(product);
     } else {
-      onCreated?.({ tempId: crypto.randomUUID(), name });
+      onCreated?.(product);
     }
     onClose();
   }
@@ -73,6 +84,22 @@ export function QuickAddProductModal({
               placeholder="Ex: CAMISETA BÁSICA"
             />
           </div>
+
+          {categories.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+              >
+                <option value="">Sem categoria</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import { Plus, Trash2, ShoppingCart, Paperclip, Pencil, Check, X, Camera } from "lucide-react";
 
@@ -42,41 +42,74 @@ function CurrencyInput({
   onChange: (v: number) => void;
   className?: string;
 }) {
-  const [display, setDisplay] = useState(
-    value === 0 ? "" : `R$ ${value.toFixed(2).replace(".", ",")}`,
-  );
-  const [focused, setFocused] = useState(false);
+  const [cents, setCents] = useState(() => Math.round(value * 100));
+  const internalRef = useRef(false);
 
-  useEffect(() => {
-    if (!focused) {
-      setDisplay(value === 0 ? "" : `R$ ${value.toFixed(2).replace(".", ",")}`);
+  // Sync when parent resets value (e.g. after addItem resets unitCost to 0)
+  useLayoutEffect(() => {
+    if (internalRef.current) {
+      internalRef.current = false;
+      return;
     }
-  }, [value, focused]);
+    setCents(Math.round(value * 100));
+  }, [value]);
 
-  function handleFocus() {
-    setFocused(true);
-    setDisplay(value === 0 ? "" : String(value));
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key >= "0" && e.key <= "9") {
+      e.preventDefault();
+      const newCents = Math.min(cents * 10 + parseInt(e.key, 10), 99999999);
+      setCents(newCents);
+      internalRef.current = true;
+      onChange(newCents / 100);
+    } else if (e.key === "Backspace") {
+      e.preventDefault();
+      const newCents = Math.floor(cents / 10);
+      setCents(newCents);
+      internalRef.current = true;
+      onChange(newCents / 100);
+    } else if (e.key === "Delete" || e.key === "Escape") {
+      e.preventDefault();
+      setCents(0);
+      internalRef.current = true;
+      onChange(0);
+    }
   }
 
-  function handleBlur() {
-    setFocused(false);
-    const cleaned = display.replace(/[^0-9,.]/g, "").replace(",", ".");
-    const num = parseFloat(cleaned) || 0;
-    onChange(num);
-    setDisplay(num === 0 ? "" : `R$ ${num.toFixed(2).replace(".", ",")}`);
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text").trim();
+    // Aceita formatos: 28,47 | 28.47 | R$ 28,47 | 1.234,56 | 1,234.56
+    const cleaned = text.replace(/[^\d,\.]/g, "");
+    let num = 0;
+    if (/^\d+,\d{2}$/.test(cleaned)) {
+      // Formato BR: 28,47
+      num = parseFloat(cleaned.replace(",", "."));
+    } else if (/^\d{1,3}(\.\d{3})+(,\d{2})?$/.test(cleaned)) {
+      // Formato BR com milhar: 1.234,56
+      num = parseFloat(cleaned.replace(/\./g, "").replace(",", "."));
+    } else {
+      // Tenta parse direto (28.47 ou 28)
+      num = parseFloat(cleaned.replace(",", ".")) || 0;
+    }
+    const newCents = Math.min(Math.round(num * 100), 99999999);
+    setCents(newCents);
+    internalRef.current = true;
+    onChange(newCents / 100);
   }
+
+  const display = cents === 0 ? "" : `R$ ${(cents / 100).toFixed(2).replace(".", ",")}`;
 
   return (
     <>
       <input type="hidden" name={name} value={value} />
       <input
         type="text"
-        inputMode="decimal"
-        value={focused ? display : display}
+        inputMode="numeric"
+        value={display}
         placeholder="R$ 0,00"
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onChange={(e) => setDisplay(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
+        onChange={() => {}}
         className={className}
       />
     </>
@@ -106,15 +139,12 @@ export function PurchaseForm({
   const [items, setItems] = useState<Item[]>([]);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [selectedVariantId, setSelectedVariantId] = useState("");
-  const [qty, setQty] = useState(1);
-  const [unitCost, setUnitCost] = useState(0);
   const [freightCost, setFreightCost] = useState(0);
   const [productSearch, setProductSearch] = useState("");
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
   const [editQty, setEditQty] = useState(1);
   const [editUnitCost, setEditUnitCost] = useState(0);
-  const [pendingProducts, setPendingProducts] = useState<Array<{tempId: string; name: string}>>([]);
+  const [pendingProducts, setPendingProducts] = useState<Array<{tempId: string; name: string; categoryId?: string}>>([]);
   const [pendingVariants, setPendingVariants] = useState<Array<{tempId: string; productTempId: string; color: string; colorHex?: string; size: string; photoUrl?: string}>>([]);
 
   const selectedProduct = products.find((p) => p.id === selectedProductId);
@@ -124,12 +154,12 @@ export function PurchaseForm({
   const effectiveProductName = selectedProduct?.name ?? selectedPendingProduct?.name ?? "";
 
   function addItem() {
-    if (!selectedVariant || qty < 1) return;
+    if (!selectedVariant) return;
     const exists = items.find((i) => i.variantId === selectedVariantId);
     if (exists) {
       setItems(items.map((i) =>
         i.variantId === selectedVariantId
-          ? { ...i, quantity: i.quantity + qty, unitCost }
+          ? { ...i, quantity: i.quantity + 1 }
           : i
       ));
     } else {
@@ -141,14 +171,12 @@ export function PurchaseForm({
         productName: selectedProduct!.name,
         imageUrl,
         label: `${selectedVariant.color} · ${selectedVariant.size}`,
-        quantity: qty,
-        unitCost,
+        quantity: 1,
+        unitCost: 0,
       }]);
     }
     setSelectedProductId("");
     setSelectedVariantId("");
-    setQty(1);
-    setUnitCost(0);
     setProductSearch("");
   }
 
@@ -206,9 +234,8 @@ export function PurchaseForm({
   }
 
   const productsCost = items.reduce((s, i) => s + i.quantity * i.unitCost, 0);
-  const currentItemCost = qty * unitCost;
   const totalItems = items.reduce((s, i) => s + i.quantity, 0);
-  const totalCost = productsCost + currentItemCost + freightCost;
+  const totalCost = productsCost + freightCost;
 
   return (
     <>
@@ -224,10 +251,10 @@ export function PurchaseForm({
         open={productModalOpen}
         onClose={() => setProductModalOpen(false)}
         defaultName={productSearch}
+        categories={categories}
         onCreated={(p) => {
           // Produto pendente: rastreado em pendingProducts mas NÃO adicionado ao dropdown
-          setPendingProducts((prev) => [...prev, { tempId: p.tempId, name: p.name }]);
-          setSelectedCategoryId("");
+          setPendingProducts((prev) => [...prev, { tempId: p.tempId, name: p.name, categoryId: p.categoryId }]);
           setSelectedProductId(p.tempId);
           setSelectedVariantId("");
         }}
@@ -322,7 +349,7 @@ export function PurchaseForm({
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
               Informações da compra
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               {/* Fornecedor */}
               <div className="sm:col-span-2 lg:col-span-1">
                 <label className="block text-xs font-medium text-slate-700 mb-1">Fornecedor</label>
@@ -436,27 +463,6 @@ export function PurchaseForm({
                 </select>
               </div>
 
-              {/* Categoria */}
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Categoria</label>
-                <select
-                  value={selectedCategoryId}
-                  onChange={(e) => {
-                    const newCat = e.target.value;
-                    setSelectedCategoryId(newCat);
-                    if (newCat && selectedProduct && !selectedProduct.isPending && selectedProduct.categoryId !== newCat) {
-                      setSelectedProductId("");
-                      setSelectedVariantId("");
-                    }
-                  }}
-                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
-                >
-                  <option value="">Todas</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
             </div>
           </div>
 
@@ -467,19 +473,21 @@ export function PurchaseForm({
             </h2>
 
             {/* Linha de adicionar item */}
-            <div className="shrink-0 grid grid-cols-1 sm:grid-cols-[1fr_1fr_100px_120px_auto] gap-2 items-end">
+            <div className="shrink-0 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
               {/* Produto */}
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Produto</label>
+
                 {products.length > 10 && !selectedPendingProduct && (
                   <input
                     type="text"
                     value={productSearch}
                     onChange={(e) => { setProductSearch(e.target.value); setSelectedProductId(""); setSelectedVariantId(""); }}
-                    placeholder="Buscar..."
+                    placeholder="Buscar produto..."
                     className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 placeholder:text-slate-400 mb-1"
                   />
                 )}
+
                 {/* Produto pendente: mostra badge no lugar do dropdown */}
                 {selectedPendingProduct ? (
                   <div className="flex items-center gap-1.5">
@@ -511,12 +519,11 @@ export function PurchaseForm({
                       onChange={(e) => { setSelectedProductId(e.target.value); setSelectedVariantId(""); }}
                       className="flex-1 min-w-0 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
                     >
-                      <option value="">Selecione...</option>
+                      <option value="">Selecione o produto...</option>
                       {products
                         .filter((p) =>
                           p.id === selectedProductId ||
-                          ((!selectedCategoryId || !p.categoryId || p.categoryId === selectedCategoryId) &&
-                          (products.length <= 10 || p.name.toLowerCase().includes(productSearch.toLowerCase())))
+                          (products.length <= 10 || p.name.toLowerCase().includes(productSearch.toLowerCase()))
                         )
                         .map((p) => (
                           <option key={p.id} value={p.id}>{p.name}</option>
@@ -573,35 +580,12 @@ export function PurchaseForm({
                 )}
               </div>
 
-              {/* Quantidade */}
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Qtd.</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={qty}
-                  onChange={(e) => setQty(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
-                />
-              </div>
-
-              {/* Custo unitário */}
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Custo unit.</label>
-                <CurrencyInput
-                  name=""
-                  value={unitCost}
-                  onChange={setUnitCost}
-                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
-                />
-              </div>
-
               {/* Botão */}
               <button
                 type="button"
                 onClick={addItem}
-                disabled={!selectedVariantId || qty < 1}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:bg-slate-50 disabled:text-slate-300 transition whitespace-nowrap"
+                disabled={!selectedVariantId}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:bg-slate-50 disabled:text-slate-300 transition whitespace-nowrap self-end"
               >
                 <Plus size={14} />
                 Adicionar
@@ -741,7 +725,7 @@ export function PurchaseForm({
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">Valor da Compra</label>
               <div className="w-full px-3 py-1.5 border border-slate-100 rounded-lg text-sm bg-slate-50 text-slate-500 select-none">
-                {formatCurrency(productsCost + qty * unitCost)}
+                {formatCurrency(productsCost)}
               </div>
             </div>
             <div>

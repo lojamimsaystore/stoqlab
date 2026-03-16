@@ -198,6 +198,42 @@ export async function createSaleAction(
     });
   }
 
+  // ─── Pagamento parcial → cria dívida automaticamente ────────
+  const paymentStatus = (formData.get("paymentStatus") as string) || "paid";
+  const partialPaidAmount = Number(formData.get("partialPaidAmount") || 0);
+
+  if (paymentStatus === "partial" && resolvedCustomerId) {
+    const remaining = totalValue - partialPaidAmount;
+    const debtStatus =
+      partialPaidAmount <= 0 ? "open" : partialPaidAmount >= totalValue ? "paid" : "partial";
+
+    const { data: debt } = await supabaseAdmin
+      .from("debts")
+      .insert({
+        tenant_id: tenantId,
+        customer_id: resolvedCustomerId,
+        sale_id: sale.id,
+        total_amount: totalValue.toFixed(2),
+        description: `Venda de ${new Date().toLocaleDateString("pt-BR")} — ${parsed.data.items.length} produto(s)`,
+        status: debtStatus,
+      })
+      .select("id")
+      .single();
+
+    if (debt && partialPaidAmount > 0) {
+      await supabaseAdmin.from("debt_payments").insert({
+        tenant_id: tenantId,
+        debt_id: debt.id,
+        amount: partialPaidAmount.toFixed(2),
+        payment_method: parsed.data.paymentMethod === "installment" ? "credit" : parsed.data.paymentMethod,
+        paid_at: new Date().toISOString(),
+        notes: `Pagamento no ato da venda. Restante: R$ ${remaining.toFixed(2)}`,
+      });
+    }
+
+    revalidatePath("/devedores");
+  }
+
   revalidatePath("/vendas");
   revalidatePath("/estoque");
   redirect("/vendas");

@@ -97,6 +97,8 @@ export function SaleForm({ variants, locations }: { variants: Variant[]; locatio
   const [selectedLocationId, setSelectedLocationId] = useState(locations[0]?.id ?? "");
   const [installments, setInstallments] = useState(1);
   const [hasInterest, setHasInterest] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<"paid" | "partial">("paid");
+  const [partialPaidAmount, setPartialPaidAmount] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Customer — existing
@@ -689,6 +691,71 @@ export function SaleForm({ variants, locations }: { variants: Variant[]; locatio
             </div>
           </div>
 
+          {/* ─── Status do pagamento ─── */}
+          <div className="px-3 py-3 border-t border-slate-100 shrink-0 space-y-2">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status do pagamento</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => { setPaymentStatus("paid"); setPartialPaidAmount(""); }}
+                className={`py-2 rounded-lg border text-xs font-semibold transition-all ${
+                  paymentStatus === "paid"
+                    ? "bg-emerald-600 border-emerald-600 text-white"
+                    : "border-slate-200 text-slate-500 hover:border-emerald-300 hover:bg-emerald-50"
+                }`}
+              >
+                ✓ Pago
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentStatus("partial")}
+                className={`py-2 rounded-lg border text-xs font-semibold transition-all ${
+                  paymentStatus === "partial"
+                    ? "bg-amber-500 border-amber-500 text-white"
+                    : "border-slate-200 text-slate-500 hover:border-amber-300 hover:bg-amber-50"
+                }`}
+              >
+                ½ Pago parcialmente
+              </button>
+            </div>
+            <input type="hidden" name="paymentStatus" value={paymentStatus} />
+
+            {paymentStatus === "partial" && (
+              <div className="space-y-2 pt-1">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Valor pago agora (R$)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">R$</span>
+                    <input
+                      type="number"
+                      name="partialPaidAmount"
+                      step="0.01"
+                      min="0"
+                      max={total}
+                      value={partialPaidAmount}
+                      onChange={(e) => setPartialPaidAmount(e.target.value)}
+                      placeholder="0,00"
+                      className="w-full pl-8 pr-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                {total > 0 && (
+                  <div className="flex items-center justify-between text-xs bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+                    <span className="text-amber-700 font-medium">Vai para Devedores:</span>
+                    <span className="font-bold text-amber-800">
+                      {formatCurrency(Math.max(0, total - (Number(partialPaidAmount) || 0)))}
+                    </span>
+                  </div>
+                )}
+                {!selectedCustomer && !newCustomer && (
+                  <p className="text-[10px] text-red-500">⚠ Selecione um cliente para registrar a dívida.</p>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Total + finalizar */}
           <div className="px-3 py-3 border-t border-slate-100 shrink-0 space-y-3">
             <div className="space-y-1.5">
@@ -719,7 +786,10 @@ export function SaleForm({ variants, locations }: { variants: Variant[]; locatio
 
             <input type="hidden" name="items" value={serializedItems} />
 
-            <SubmitButton disabled={items.length === 0} />
+            <SubmitButton disabled={
+              items.length === 0 ||
+              (paymentStatus === "partial" && !selectedCustomer && !newCustomer)
+            } />
 
             <Link href="/vendas"
               className="block text-center text-xs text-slate-400 hover:text-slate-600 transition-colors">

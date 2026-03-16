@@ -18,6 +18,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Palette,
+  AlertTriangle,
 } from "lucide-react";
 import { updateSidebarColorAction, updateSidebarFontColorAction } from "@/app/(dashboard)/actions";
 import {
@@ -38,6 +39,7 @@ const NAV_ITEMS = [
   { href: "/transferencias", label: "Transferências", icon: ArrowLeftRight },
   { href: "/fornecedores", label: "Fornecedores", icon: Truck },
   { href: "/clientes", label: "Clientes", icon: Users },
+  { href: "/devedores", label: "Devedores", icon: AlertTriangle },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
 ];
 

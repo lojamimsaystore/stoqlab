@@ -66,17 +66,19 @@ async function getOrCreateDefaultLocation(tenantId: string): Promise<string> {
     .eq("tenant_id", tenantId)
     .is("deleted_at", null)
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (data) return data.id;
 
-  const { data: created } = await supabaseAdmin
+  const { data: created, error: locError } = await supabaseAdmin
     .from("locations")
     .insert({ tenant_id: tenantId, name: "Estoque Principal", type: "warehouse" })
     .select("id")
     .single();
 
-  return created!.id;
+  if (locError || !created) throw new Error(`Erro ao criar localização padrão: ${locError?.message ?? "desconhecido"}`);
+
+  return created.id;
 }
 
 export type PurchaseState = { error?: string };
@@ -99,7 +101,7 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
   const tenantId = await getTenantId();
 
   // Parse pending products e variants
-  type PendingProductData = { tempId: string; name: string };
+  type PendingProductData = { tempId: string; name: string; categoryId?: string };
   type PendingVariantData = { tempId: string; productTempId: string; color: string; colorHex?: string; size: string; photoUrl?: string };
 
   let pendingProducts: PendingProductData[] = [];
@@ -157,7 +159,7 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
       const coverImageUrl = pendingVariants.find((pv) => pv.productTempId === pp.tempId && pv.photoUrl)?.photoUrl ?? null;
       const { data: product } = await supabaseAdmin
         .from("products")
-        .insert({ tenant_id: tenantId, name: pp.name, status: "active", cover_image_url: coverImageUrl })
+        .insert({ tenant_id: tenantId, name: pp.name, status: "active", cover_image_url: coverImageUrl, category_id: pp.categoryId ?? null })
         .select("id")
         .single();
       if (product) {
@@ -174,14 +176,32 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
     const productId = productIdMap[pv.productTempId] ?? pv.productTempId;
     const productName = pendingProducts.find(p => p.tempId === pv.productTempId)?.name ?? "";
     const sku = generateSku(productName || pv.productTempId, pv.color, pv.size);
-    const { data: variant } = await supabaseAdmin
+
+    // Check if variant with this SKU already exists (avoids unique constraint failure on retry)
+    const { data: existingVariant } = await supabaseAdmin
       .from("product_variants")
-      .insert({ tenant_id: tenantId, product_id: productId, color: pv.color, color_hex: pv.colorHex ?? null, size: pv.size, sku, min_stock: 0 })
       .select("id")
-      .single();
-    if (variant) {
-      variantIdMap[pv.tempId] = variant.id;
-      createdVariantIds.push(variant.id);
+      .eq("tenant_id", tenantId)
+      .eq("sku", sku)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (existingVariant) {
+      variantIdMap[pv.tempId] = existingVariant.id;
+    } else {
+      const { data: variant, error: variantError } = await supabaseAdmin
+        .from("product_variants")
+        .insert({ tenant_id: tenantId, product_id: productId, color: pv.color, color_hex: pv.colorHex ?? null, size: pv.size, sku, min_stock: 0 })
+        .select("id")
+        .single();
+      if (variantError) {
+        await rollback();
+        return { error: `Erro ao criar variação (${pv.color} / ${pv.size}): ${variantError.message}` };
+      }
+      if (variant) {
+        variantIdMap[pv.tempId] = variant.id;
+        createdVariantIds.push(variant.id);
+      }
     }
   }
 
@@ -195,6 +215,15 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
     ...item,
     variantId: variantIdMap[item.variantId] ?? item.variantId,
   }));
+
+  // Verifica se todos os tempIds de variações pendentes foram resolvidos
+  const unresolvedItems = resolvedItems.filter(item =>
+    pendingVariants.some(pv => pv.tempId === item.variantId)
+  );
+  if (unresolvedItems.length > 0) {
+    await rollback();
+    return { error: "Não foi possível criar algumas variações. Verifique se a combinação cor/tamanho já existe para este produto." };
+  }
 
   const totalItems = resolvedItems.reduce((s, i) => s + i.quantity, 0);
   const productsCost = resolvedItems.reduce((s, i) => s + i.quantity * i.unitCost, 0);
@@ -261,9 +290,10 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
     const { data: inv } = await supabaseAdmin
       .from("inventory")
       .select("id, quantity")
+      .eq("tenant_id", tenantId)
       .eq("variant_id", item.variantId)
       .eq("location_id", locationId)
-      .single();
+      .maybeSingle();
 
     if (inv) {
       await supabaseAdmin

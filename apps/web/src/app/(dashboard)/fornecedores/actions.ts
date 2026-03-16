@@ -38,6 +38,18 @@ export async function createSupplierAction(
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
   const { complement, ...coreData } = parsed.data;
+
+  const { data: existing } = await supabaseAdmin
+    .from("suppliers")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .ilike("name", coreData.name.trim())
+    .is("deleted_at", null)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) return { error: `Já existe um fornecedor com o nome "${coreData.name}".` };
+
   const { error } = await supabaseAdmin.from("suppliers").insert({
     ...coreData,
     ...(complement ? { complement } : {}),
@@ -83,6 +95,18 @@ export async function createSupplierInlineAction(
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
   const { complement, ...coreData } = parsed.data;
+
+  const { data: existing } = await supabaseAdmin
+    .from("suppliers")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .ilike("name", coreData.name.trim())
+    .is("deleted_at", null)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) return { error: `Já existe um fornecedor com o nome "${coreData.name}".` };
+
   const { data, error } = await supabaseAdmin
     .from("suppliers")
     .insert({

@@ -137,7 +137,7 @@ function ColorGroupRows({
                     value={markup}
                     onChange={(e) => handleMarkupChange(e.target.value)}
                     placeholder="0"
-                    className={`w-10 text-xs font-semibold text-slate-700 bg-white border rounded px-1.5 py-0.5 outline-none focus:border-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors ${
+                    className={`w-16 text-xs font-semibold text-slate-700 bg-white border rounded px-1.5 py-0.5 outline-none focus:border-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors ${
                       isDirty ? "border-amber-400 bg-amber-50" : "border-slate-200"
                     }`}
                   />
@@ -293,9 +293,9 @@ export function VariantColorGroups({
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[14%]">Cor</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[7%]">Tamanho</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[7%]">Peças</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[18%]">SKU</th>
+                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[14%]">SKU</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[11%]">Custo unit.</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[9%]">Margem</th>
+                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[13%]">Margem</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[11%]">Valor final</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Lucro</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Lucro total</th>

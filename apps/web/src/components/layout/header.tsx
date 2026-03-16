@@ -197,17 +197,13 @@ export function Header({ onMenuClick, userName, userEmail, userRole, lowStockIte
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <form action={logoutAction} className="w-full">
-              <DropdownMenuItem asChild>
-                <button
-                  type="submit"
-                  className="w-full flex items-center gap-2 text-red-600 focus:bg-red-50 focus:text-red-600"
-                >
-                  <LogOut size={14} />
-                  Sair
-                </button>
-              </DropdownMenuItem>
-            </form>
+            <DropdownMenuItem
+              className="flex items-center gap-2 text-red-600 focus:bg-red-50 focus:text-red-600 cursor-pointer"
+              onSelect={() => logoutAction()}
+            >
+              <LogOut size={14} />
+              Sair
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

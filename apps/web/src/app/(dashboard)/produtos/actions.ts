@@ -242,6 +242,46 @@ export async function toggleProductArchiveAction(
   revalidatePath("/produtos");
 }
 
+// ─── Excluir múltiplos produtos ──────────────────────────────
+
+export async function bulkDeleteProductsAction(ids: string[]): Promise<{ error?: string; deleted: number }> {
+  const tenantId = await getTenantId();
+  let deleted = 0;
+
+  for (const id of ids) {
+    const { data: variants } = await supabaseAdmin
+      .from("product_variants")
+      .select("id")
+      .eq("product_id", id)
+      .eq("tenant_id", tenantId);
+
+    const variantIds = variants?.map((v) => v.id) ?? [];
+
+    if (variantIds.length > 0) {
+      const [{ data: saleItems }, { data: purchaseItems }, { data: transferItems }] = await Promise.all([
+        supabaseAdmin.from("sale_items").select("id").in("variant_id", variantIds).limit(1),
+        supabaseAdmin.from("purchase_items").select("id").in("variant_id", variantIds).limit(1),
+        supabaseAdmin.from("transfer_items").select("id").in("variant_id", variantIds).limit(1),
+      ]);
+
+      if (saleItems?.length || purchaseItems?.length || transferItems?.length) {
+        continue; // pula produtos vinculados
+      }
+
+      await supabaseAdmin.from("inventory_movements").delete().in("variant_id", variantIds);
+      await supabaseAdmin.from("inventory").delete().in("variant_id", variantIds);
+      await supabaseAdmin.from("product_variants").delete().in("id", variantIds);
+    }
+
+    const { error } = await supabaseAdmin.from("products").delete().eq("id", id).eq("tenant_id", tenantId);
+    if (!error) deleted++;
+  }
+
+  revalidatePath("/produtos");
+  revalidatePath("/estoque");
+  return { deleted };
+}
+
 // ─── Excluir produto ──────────────────────────────────────────
 
 export async function deleteProductAction(id: string): Promise<{ error?: string }> {

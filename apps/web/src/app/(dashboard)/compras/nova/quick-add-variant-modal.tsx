@@ -158,15 +158,21 @@ export function QuickAddVariantModal({
   // ── Ações de tamanho (para a cor ativa) ──
   function toggleSize(size: string) {
     if (!activeColorName) return;
-    setColorSizes((prev) => {
-      const current = prev[activeColorName] ?? [];
-      return {
-        ...prev,
-        [activeColorName]: current.includes(size)
-          ? current.filter((s) => s !== size)
-          : [...current, size],
-      };
-    });
+    const current = colorSizes[activeColorName] ?? [];
+    const isRemoving = current.includes(size);
+    setColorSizes((prev) => ({
+      ...prev,
+      [activeColorName]: isRemoving
+        ? current.filter((s) => s !== size)
+        : [...current, size],
+    }));
+    if (!isRemoving) {
+      setColorSizeQtys((prev) => {
+        const colorQtys = prev[activeColorName] ?? {};
+        if (colorQtys[size]) return prev; // já tem valor, não sobrescreve
+        return { ...prev, [activeColorName]: { ...colorQtys, [size]: "1" } };
+      });
+    }
   }
 
   function confirmCustomSize() {
@@ -174,10 +180,19 @@ export function QuickAddVariantModal({
     if (!s) { setCustomSizeMode(false); return; }
     if (!allSizes.includes(s)) setExtraSizes((prev) => [...prev, s]);
     if (activeColorName) {
+      const current = colorSizes[activeColorName] ?? [];
+      const isNew = !current.includes(s);
       setColorSizes((prev) => {
-        const current = prev[activeColorName] ?? [];
-        return { ...prev, [activeColorName]: current.includes(s) ? current : [...current, s] };
+        const cur = prev[activeColorName] ?? [];
+        return { ...prev, [activeColorName]: cur.includes(s) ? cur : [...cur, s] };
       });
+      if (isNew) {
+        setColorSizeQtys((prev) => {
+          const colorQtys = prev[activeColorName] ?? {};
+          if (colorQtys[s]) return prev;
+          return { ...prev, [activeColorName]: { ...colorQtys, [s]: "1" } };
+        });
+      }
     }
     setCustomSizeMode(false); setCustomSizeInput("");
   }

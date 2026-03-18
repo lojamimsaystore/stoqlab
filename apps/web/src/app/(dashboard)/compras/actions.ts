@@ -323,6 +323,7 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
 
   revalidatePath("/compras");
   revalidatePath("/estoque");
+  revalidatePath("/produtos");
   redirect("/compras");
 }
 
@@ -375,6 +376,15 @@ export async function uploadInvoiceAction(
 
   revalidatePath(`/compras/${purchaseId}`);
   return { url };
+}
+
+export async function bulkDeletePurchasesAction(ids: string[]): Promise<{ deleted: number }> {
+  let deleted = 0;
+  for (const id of ids) {
+    const result = await deletePurchaseAction(id);
+    if (!result.error) deleted++;
+  }
+  return { deleted };
 }
 
 export async function deletePurchaseAction(id: string): Promise<{ error?: string }> {

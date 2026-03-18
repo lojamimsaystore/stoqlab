@@ -286,6 +286,15 @@ export async function searchCustomersAction(query: string): Promise<CustomerResu
   return (data ?? []) as CustomerResult[];
 }
 
+export async function bulkCancelSalesAction(ids: string[]): Promise<{ deleted: number }> {
+  let deleted = 0;
+  for (const id of ids) {
+    const result = await cancelSaleAction(id);
+    if (!result.error) deleted++;
+  }
+  return { deleted };
+}
+
 export async function cancelSaleAction(id: string): Promise<{ error?: string }> {
   const tenantId = await getTenantId();
 

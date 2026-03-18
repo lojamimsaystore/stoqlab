@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { Plus, ShoppingBag, Download, Eye } from "lucide-react";
+import { Plus, ShoppingBag } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
-import { formatCurrency, formatDate } from "@stoqlab/utils";
-import { DeletePurchaseButton } from "./delete-purchase-button";
 import { SearchInput } from "@/components/ui/search-input";
 import { StatusFilter } from "./status-filter";
-import { PurchaseStatusSelect } from "./purchase-status-select";
+import { PurchasesTable } from "./purchases-table";
 import { Suspense } from "react";
 
 
@@ -83,73 +81,7 @@ export default async function ComprasPage({
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 text-left border-b border-slate-100">
-                <th className="px-4 py-3 font-medium text-slate-600">Data</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">Fornecedor</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell">NF</th>
-                <th className="px-4 py-3 font-medium text-slate-600 text-center">Peças</th>
-                <th className="px-4 py-3 font-medium text-slate-600 text-right">Total</th>
-                <th className="px-4 py-3 font-medium text-slate-600">Status</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {purchases.map((p) => {
-                const total =
-                  Number(p.products_cost) + Number(p.freight_cost) + Number(p.other_costs);
-                const supplier = (p.suppliers as unknown as Array<{ name: string }> | null)?.[0] ?? null;
-                return (
-                  <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 text-slate-700">{formatDate(p.purchased_at)}</td>
-                    <td className="px-4 py-3 hidden sm:table-cell text-slate-700">
-                      {supplier?.name ?? <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-500 font-mono text-xs">{p.invoice_number ?? "—"}</span>
-                        {p.invoice_url && (
-                          <a
-                            href={p.invoice_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Baixar nota fiscal"
-                            aria-label="Baixar nota fiscal"
-                            className="text-slate-400 hover:text-blue-600 transition"
-                          >
-                            <Download size={12} />
-                          </a>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-center text-slate-700">{p.total_items}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                      {formatCurrency(total)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <PurchaseStatusSelect id={p.id} status={p.status} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link
-                          href={`/compras/${p.id}`}
-                          title="Ver compra"
-                          aria-label="Ver detalhes da compra"
-                          className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded"
-                        >
-                          <Eye size={15} />
-                        </Link>
-                        <DeletePurchaseButton id={p.id} />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <PurchasesTable purchases={purchases as Parameters<typeof PurchasesTable>[0]["purchases"]} />
       )}
     </div>
   );

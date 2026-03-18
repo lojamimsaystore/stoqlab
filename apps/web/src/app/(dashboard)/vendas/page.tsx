@@ -1,42 +1,13 @@
 import Link from "next/link";
-import { Plus, ShoppingBag, Eye } from "lucide-react";
-import { PrintReceiptButton } from "./print-receipt-button";
+import { Plus, ShoppingBag } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
-import { formatCurrency, formatDate } from "@stoqlab/utils";
-import { CancelSaleButton } from "./cancel-sale-button";
+import { formatCurrency } from "@stoqlab/utils";
 import { SearchInput } from "@/components/ui/search-input";
 import { StatusFilter } from "./status-filter";
+import { SalesTable } from "./sales-table";
 import { Suspense } from "react";
 
-const PAYMENT_LABELS: Record<string, string> = {
-  cash: "Dinheiro",
-  pix: "Pix",
-  debit: "Débito",
-  credit: "Crédito",
-  installment: "Parcelado",
-};
-
-function parseInstallments(notes: string | null): string | null {
-  if (!notes) return null;
-  const match = notes.match(/^(\d+)x (com|sem) juros/);
-  if (!match) return null;
-  return `${match[1]}x ${match[2] === "com" ? "c/ juros" : "s/ juros"}`;
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  completed: "bg-emerald-100 text-emerald-700",
-  pending: "bg-amber-100 text-amber-700",
-  cancelled: "bg-red-100 text-red-600",
-  refunded: "bg-slate-100 text-slate-600",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  completed: "Concluída",
-  pending: "Pendente",
-  cancelled: "Cancelada",
-  refunded: "Estornada",
-};
 
 export default async function VendasPage({
   searchParams,
@@ -111,85 +82,21 @@ export default async function VendasPage({
         </Suspense>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        {!filtered.length ? (
-          <div className="py-16 flex flex-col items-center gap-2 text-slate-400">
-            <ShoppingBag size={36} className="text-slate-300" />
-            <p className="text-sm font-medium text-slate-500">
-              {q || status ? "Nenhuma venda encontrada com esses filtros" : "Nenhuma venda registrada"}
-            </p>
-            {!q && !status && (
-              <Link href="/vendas/nova" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium mt-1">
-                Registrar primeira venda
-              </Link>
-            )}
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 text-left border-b border-slate-100">
-                <th className="px-4 py-3 font-medium text-slate-600">Data</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">Cliente</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell">Pagamento</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden xl:table-cell">Parcelas</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden lg:table-cell">Local</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden lg:table-cell">Desconto</th>
-                <th className="px-4 py-3 font-medium text-slate-600 text-right">Total</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell text-right">Margem</th>
-                <th className="px-4 py-3 font-medium text-slate-600">Status</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map((s) => {
-                const customer = (s.customers as unknown as Array<{ name: string }> | null)?.[0] ?? null;
-                const location = s.locations as unknown as { name: string } | null;
-                const installmentLabel = parseInstallments(s.notes ?? null);
-                return (
-                <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 text-slate-700">{formatDate(s.sold_at)}</td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-slate-700">
-                    {customer?.name ?? <span className="text-slate-400">—</span>}
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-600">
-                    {PAYMENT_LABELS[s.payment_method] ?? s.payment_method}
-                  </td>
-                  <td className="px-4 py-3 hidden xl:table-cell text-slate-500 text-xs">
-                    {installmentLabel ?? <span className="text-slate-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs">
-                    {location?.name ?? <span className="text-slate-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-slate-500">
-                    {Number(s.discount_value) > 0 ? formatCurrency(Number(s.discount_value)) : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                    {formatCurrency(Number(s.total_value))}
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-right text-emerald-600 font-medium">
-                    {s.gross_margin ? `${Number(s.gross_margin).toFixed(1)}%` : "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLOR[s.status] ?? ""}`}>
-                      {STATUS_LABEL[s.status]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <PrintReceiptButton id={s.id} />
-                      <Link href={`/vendas/${s.id}`} title="Ver venda" aria-label="Ver detalhes da venda"
-                        className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded inline-flex">
-                        <Eye size={15} />
-                      </Link>
-                      {s.status === "completed" && <CancelSaleButton id={s.id} />}
-                    </div>
-                  </td>
-                </tr>
-              );})}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {!filtered.length ? (
+        <div className="bg-white rounded-xl border border-slate-200 py-16 flex flex-col items-center gap-2 text-slate-400">
+          <ShoppingBag size={36} className="text-slate-300" />
+          <p className="text-sm font-medium text-slate-500">
+            {q || status ? "Nenhuma venda encontrada com esses filtros" : "Nenhuma venda registrada"}
+          </p>
+          {!q && !status && (
+            <Link href="/vendas/nova" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium mt-1">
+              Registrar primeira venda
+            </Link>
+          )}
+        </div>
+      ) : (
+        <SalesTable sales={filtered as Parameters<typeof SalesTable>[0]["sales"]} />
+      )}
     </div>
   );
 }

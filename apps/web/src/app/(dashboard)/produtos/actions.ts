@@ -556,6 +556,40 @@ export async function cleanOrphanVariantsAction(): Promise<void> {
   revalidatePath("/produtos");
 }
 
+// ─── Atualizar nome e foto do produto (sem redirect — usado em modal) ────────
+
+export async function updateProductBasicInfoAction(
+  id: string,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const tenantId = await getTenantId();
+
+  const name = (formData.get("name") as string)?.trim().toUpperCase();
+  if (!name) return { error: "Nome obrigatório." };
+
+  let coverImageUrl: string | undefined;
+  const photo = formData.get("photo") as File | null;
+  if (photo && photo.size > 0) {
+    const url = await uploadPhoto(photo, tenantId, id);
+    if (url) coverImageUrl = url;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("products")
+    .update({
+      name,
+      ...(coverImageUrl ? { cover_image_url: coverImageUrl } : {}),
+    })
+    .eq("id", id)
+    .eq("tenant_id", tenantId);
+
+  if (error) return { error: "Erro ao atualizar produto." };
+
+  revalidatePath("/produtos");
+  revalidatePath("/compras");
+  return {};
+}
+
 // ─── Excluir variação ─────────────────────────────────────────
 
 export async function deleteVariantAction(id: string, productId: string) {

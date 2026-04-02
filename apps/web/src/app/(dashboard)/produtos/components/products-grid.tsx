@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Package, Trash2, X, Check } from "lucide-react";
+import { Package, Trash2, X, Check, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { bulkDeleteProductsAction } from "../actions";
 import { DeleteProductButton } from "./delete-product-button";
 import { ArchiveProductButton } from "./archive-product-button";
+import { EditProductModal } from "./edit-product-modal";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Ativo",
@@ -51,6 +52,7 @@ export function ProductsGrid({ products }: { products: Product[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const hasSelection = selected.size > 0;
   const allSelected = products.length > 0 && selected.size === products.length;
@@ -202,6 +204,14 @@ export function ProductsGrid({ products }: { products: Product[] }) {
               {!hasSelection && (
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-sm flex items-center">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); setEditingProduct(p); }}
+                      title="Editar nome e foto"
+                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition"
+                    >
+                      <Pencil size={13} />
+                    </button>
                     <ArchiveProductButton id={p.id} status={p.status} />
                     <DeleteProductButton id={p.id} name={p.name} />
                   </div>
@@ -270,6 +280,13 @@ export function ProductsGrid({ products }: { products: Product[] }) {
           );
         })}
       </div>
+
+      {editingProduct && (
+        <EditProductModal
+          product={editingProduct}
+          onClose={() => setEditingProduct(null)}
+        />
+      )}
     </div>
   );
 }

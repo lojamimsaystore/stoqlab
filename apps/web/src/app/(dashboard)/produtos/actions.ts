@@ -51,7 +51,7 @@ async function uploadPhoto(
     if (error) return null;
 
     const { data } = supabaseAdmin.storage.from("products").getPublicUrl(path);
-    return data.publicUrl;
+    return `${data.publicUrl}?t=${Date.now()}`;
   } catch {
     return null;
   }
@@ -571,7 +571,8 @@ export async function updateProductBasicInfoAction(
   const photo = formData.get("photo") as File | null;
   if (photo && photo.size > 0) {
     const url = await uploadPhoto(photo, tenantId, id);
-    if (url) coverImageUrl = url;
+    if (!url) return { error: "Erro ao fazer upload da foto. Verifique o tamanho e formato do arquivo." };
+    coverImageUrl = url;
   }
 
   const { error } = await supabaseAdmin
@@ -584,6 +585,34 @@ export async function updateProductBasicInfoAction(
     .eq("tenant_id", tenantId);
 
   if (error) return { error: "Erro ao atualizar produto." };
+
+  revalidatePath("/produtos");
+  revalidatePath(`/produtos/${id}`);
+  revalidatePath("/compras");
+  return {};
+}
+
+// ─── Atualizar cores das variações de um produto ─────────────────────────────
+
+export async function updateProductVariantColorsAction(
+  productId: string,
+  updates: { oldColor: string; newColor: string; newHex: string | null }[],
+): Promise<{ error?: string }> {
+  const tenantId = await getTenantId();
+
+  for (const u of updates) {
+    const newColor = u.newColor.trim().toUpperCase();
+    if (!newColor) return { error: "Nome de cor não pode ser vazio." };
+
+    const { error } = await supabaseAdmin
+      .from("product_variants")
+      .update({ color: newColor, color_hex: u.newHex || null })
+      .eq("product_id", productId)
+      .eq("tenant_id", tenantId)
+      .eq("color", u.oldColor);
+
+    if (error) return { error: `Erro ao atualizar cor "${u.oldColor}".` };
+  }
 
   revalidatePath("/produtos");
   revalidatePath("/compras");

@@ -12,6 +12,7 @@ export function QuickAddProductModal({
   onCreated,
   onUpdated,
   defaultName,
+  defaultCategoryId,
   editProduct,
   categories = [],
 }: {
@@ -20,6 +21,7 @@ export function QuickAddProductModal({
   onCreated?: (product: PendingProduct) => void;
   onUpdated?: (product: PendingProduct) => void;
   defaultName?: string;
+  defaultCategoryId?: string;
   editProduct?: PendingProduct;
   categories?: Category[];
 }) {
@@ -32,9 +34,9 @@ export function QuickAddProductModal({
     if (open) {
       setError("");
       setNameValue(isEdit ? (editProduct?.name ?? "") : (defaultName?.toUpperCase() ?? ""));
-      setCategoryId(isEdit ? (editProduct?.categoryId ?? "") : "");
+      setCategoryId(isEdit ? (editProduct?.categoryId ?? "") : (defaultCategoryId ?? ""));
     }
-  }, [open, isEdit, editProduct, defaultName]);
+  }, [open, isEdit, editProduct, defaultName, defaultCategoryId]);
 
   if (!open) return null;
 

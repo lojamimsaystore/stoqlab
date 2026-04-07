@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { SearchInput } from "@/components/ui/search-input";
 import { StatusFilter } from "./status-filter";
+import { DateFilter } from "./date-filter";
 import { PurchasesTable } from "./purchases-table";
 import { Suspense } from "react";
 
@@ -11,10 +12,10 @@ import { Suspense } from "react";
 export default async function ComprasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; dateFrom?: string; dateTo?: string }>;
 }) {
   const tenantId = await getTenantId();
-  const { q, status } = await searchParams;
+  const { q, status, dateFrom, dateTo } = await searchParams;
 
   let query = supabaseAdmin
     .from("purchases")
@@ -26,6 +27,9 @@ export default async function ComprasPage({
   if (status && status !== "all") {
     query = query.eq("status", status);
   }
+
+  if (dateFrom) query = query.gte("purchased_at", dateFrom);
+  if (dateTo) query = query.lte("purchased_at", dateTo);
 
   if (q) {
     // Busca por nome de produto: produto → variação → item de compra
@@ -88,6 +92,9 @@ export default async function ComprasPage({
           <SearchInput placeholder="Buscar por NF ou nome do produto…" className="flex-1" />
         </Suspense>
         <Suspense fallback={null}>
+          <DateFilter />
+        </Suspense>
+        <Suspense fallback={null}>
           <StatusFilter />
         </Suspense>
       </div>
@@ -96,9 +103,9 @@ export default async function ComprasPage({
         <div className="bg-white rounded-xl border border-slate-200 flex flex-col items-center justify-center py-16 text-center">
           <ShoppingBag size={40} className="text-slate-300 mb-4" />
           <p className="text-slate-600 font-medium">
-            {q || status ? "Nenhuma compra encontrada com esses filtros" : "Nenhuma compra registrada"}
+            {q || status || dateFrom || dateTo ? "Nenhuma compra encontrada com esses filtros" : "Nenhuma compra registrada"}
           </p>
-          {!q && !status && (
+          {!q && !status && !dateFrom && !dateTo && (
             <>
               <p className="text-slate-400 text-sm mt-1">Comece registrando sua primeira entrada de mercadoria</p>
               <Link

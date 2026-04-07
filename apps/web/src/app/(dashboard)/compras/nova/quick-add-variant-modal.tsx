@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { X, ImagePlus, Trash2, Pencil, Plus, Check, Palette } from "lucide-react";
+import { X, ImagePlus, Trash2, Pencil, Plus, Check, Palette, Minus } from "lucide-react";
 import { SIZES } from "@stoqlab/validators";
 import { uploadTempPhotoAction } from "@/app/(dashboard)/produtos/actions";
 
@@ -9,6 +9,43 @@ type PendingVariant = { tempId: string; color: string; colorHex?: string; size: 
 export type CreatedVariant = PendingVariant & { unitCost: number; quantity: number };
 
 type ColorEntry = { name: string; hex: string };
+type SizeLine = { qty: string; priceCents: number };
+
+function PriceInput({ value, onChange, className }: {
+  value: number;       // centavos
+  onChange: (cents: number) => void;
+  className?: string;
+}) {
+  const [cents, setCents] = useState(value);
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key >= "0" && e.key <= "9") {
+      e.preventDefault();
+      const next = Math.min(cents * 10 + parseInt(e.key, 10), 99999999);
+      setCents(next); onChange(next);
+    } else if (e.key === "Backspace") {
+      e.preventDefault();
+      const next = Math.floor(cents / 10);
+      setCents(next); onChange(next);
+    } else if (e.key === "Delete" || e.key === "Escape") {
+      e.preventDefault();
+      setCents(0); onChange(0);
+    }
+  }
+
+  const display = cents === 0 ? "" : `R$ ${(cents / 100).toFixed(2).replace(".", ",")}`;
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={display}
+      placeholder="R$ 0,00"
+      onKeyDown={handleKeyDown}
+      onChange={() => {}}
+      className={className}
+    />
+  );
+}
 
 const PRESET_COLORS: ColorEntry[] = [
   { name: "PRETO",        hex: "#111111" },
@@ -45,13 +82,11 @@ const LIGHT_COLORS = new Set([
 
 function isLight(hex: string) { return LIGHT_COLORS.has(hex); }
 
-function parsePriceBR(raw: string): number {
-  return parseFloat(raw.replace(",", ".").replace(/[^\d.]/g, "")) || 0;
-}
 
 export function QuickAddVariantModal({
   open, onClose, onCreated, onUpdated,
   productId: _productId, productName, editVariant,
+  existingColorNames = [],
 }: {
   open: boolean;
   onClose: () => void;
@@ -60,6 +95,7 @@ export function QuickAddVariantModal({
   productId: string;
   productName: string;
   editVariant?: PendingVariant;
+  existingColorNames?: string[];
 }) {
   const isEdit = !!editVariant;
 
@@ -86,11 +122,14 @@ export function QuickAddVariantModal({
   const [customSizeInput, setCustomSizeInput] = useState("");
   const customSizeRef = useRef<HTMLInputElement>(null);
 
-  // Qtd + Custo por cor+tamanho: { colorName -> { size -> value } }
-  const [colorSizeQtys, setColorSizeQtys] = useState<Record<string, Record<string, string>>>({});
-  const [colorSizePrices, setColorSizePrices] = useState<Record<string, Record<string, string>>>({});
+  // Linhas de qtd+preço por cor+tamanho: { colorName -> { size -> SizeLine[] } }
+  const [colorSizeLines, setColorSizeLines] = useState<Record<string, Record<string, SizeLine[]>>>({});
 
-  // Edit mode: single color + single size (comportamento anterior)
+  // Painel de edição de cor (lápis no chip)
+  const [chipEdit, setChipEdit] = useState<{ colorName: string; name: string; hex: string } | null>(null);
+  const chipColorPickerRef = useRef<HTMLInputElement>(null);
+
+  // Edit mode: single color + single size
   const [editColorName, setEditColorName] = useState("");
   const [editColorHex, setEditColorHex] = useState("#9E9E9E");
   const [editingName, setEditingName] = useState(false);
@@ -98,12 +137,18 @@ export function QuickAddVariantModal({
   const editNameRef = useRef<HTMLInputElement>(null);
   const editHexRef = useRef<HTMLInputElement>(null);
 
+  // Cores existentes de outros produtos (não estão nos presets)
+  const extraExistingColors: ColorEntry[] = existingColorNames
+    .filter((name) => !PRESET_COLORS.some((p) => p.name === name))
+    .map((name) => ({ name, hex: "#9E9E9E" }));
+
   useEffect(() => {
     if (!open) return;
     setPreview(editVariant?.photoUrl ?? null);
     setError(""); setLoading(false);
     setCustomColorMode(false); setCustomColorName(""); setCustomColorHex("#9E9E9E");
     setCustomSizeMode(false); setCustomSizeInput(""); setExtraSizes([]);
+    setChipEdit(null);
 
     if (isEdit && editVariant) {
       setEditColorName(editVariant.color);
@@ -114,29 +159,25 @@ export function QuickAddVariantModal({
       setSelectedColors([]);
       setActiveColorName(null);
       setColorSizes({});
-      setColorSizeQtys({});
-      setColorSizePrices({});
+      setColorSizeLines({});
     }
   }, [open, isEdit, editVariant]);
 
   if (!open) return null;
 
   const allSizes = [...SIZES, ...extraSizes];
-  const allPresetColors = [...PRESET_COLORS, ...customColors];
+  const allPresetColors = [...PRESET_COLORS, ...extraExistingColors, ...customColors];
 
   // ── Ações de cor ──
   function toggleColor(c: ColorEntry) {
     const already = selectedColors.find((s) => s.name === c.name);
     if (already) {
-      // Remover
       const next = selectedColors.filter((s) => s.name !== c.name);
       setSelectedColors(next);
       setColorSizes((prev) => { const r = { ...prev }; delete r[c.name]; return r; });
-      setColorSizeQtys((prev) => { const r = { ...prev }; delete r[c.name]; return r; });
-      setColorSizePrices((prev) => { const r = { ...prev }; delete r[c.name]; return r; });
+      setColorSizeLines((prev) => { const r = { ...prev }; delete r[c.name]; return r; });
       setActiveColorName(next.length > 0 ? next[next.length - 1].name : null);
     } else {
-      // Adicionar
       const next = [...selectedColors, c];
       setSelectedColors(next);
       setActiveColorName(c.name);
@@ -155,6 +196,30 @@ export function QuickAddVariantModal({
     setCustomColorName("");
   }
 
+  function confirmChipEdit() {
+    if (!chipEdit) return;
+    const { colorName: oldName, name: newName, hex: newHex } = chipEdit;
+    const trimmed = newName.trim().toUpperCase();
+    setChipEdit(null);
+    if (!trimmed) return;
+    if (trimmed !== oldName && selectedColors.some((c) => c.name === trimmed)) return;
+
+    setSelectedColors((prev) => prev.map((c) => c.name === oldName ? { ...c, name: trimmed, hex: newHex } : c));
+    if (trimmed !== oldName) {
+      setColorSizes((prev) => {
+        const next: Record<string, string[]> = {};
+        for (const [k, v] of Object.entries(prev)) next[k === oldName ? trimmed : k] = v;
+        return next;
+      });
+      setColorSizeLines((prev) => {
+        const next: Record<string, Record<string, SizeLine[]>> = {};
+        for (const [k, v] of Object.entries(prev)) next[k === oldName ? trimmed : k] = v;
+        return next;
+      });
+      if (activeColorName === oldName) setActiveColorName(trimmed);
+    }
+  }
+
   // ── Ações de tamanho (para a cor ativa) ──
   function toggleSize(size: string) {
     if (!activeColorName) return;
@@ -167,10 +232,10 @@ export function QuickAddVariantModal({
         : [...current, size],
     }));
     if (!isRemoving) {
-      setColorSizeQtys((prev) => {
-        const colorQtys = prev[activeColorName] ?? {};
-        if (colorQtys[size]) return prev; // já tem valor, não sobrescreve
-        return { ...prev, [activeColorName]: { ...colorQtys, [size]: "1" } };
+      setColorSizeLines((prev) => {
+        const colorLines = prev[activeColorName] ?? {};
+        if (colorLines[size]) return prev;
+        return { ...prev, [activeColorName]: { ...colorLines, [size]: [{ qty: "1", priceCents: 0 }] } };
       });
     }
   }
@@ -187,14 +252,55 @@ export function QuickAddVariantModal({
         return { ...prev, [activeColorName]: cur.includes(s) ? cur : [...cur, s] };
       });
       if (isNew) {
-        setColorSizeQtys((prev) => {
-          const colorQtys = prev[activeColorName] ?? {};
-          if (colorQtys[s]) return prev;
-          return { ...prev, [activeColorName]: { ...colorQtys, [s]: "1" } };
+        setColorSizeLines((prev) => {
+          const colorLines = prev[activeColorName] ?? {};
+          if (colorLines[s]) return prev;
+          return { ...prev, [activeColorName]: { ...colorLines, [s]: [{ qty: "1", priceCents: 0 }] } };
         });
       }
     }
     setCustomSizeMode(false); setCustomSizeInput("");
+  }
+
+  // ── Ações de linhas por tamanho ──
+  function addSizeLine(colorName: string, size: string) {
+    setColorSizeLines((prev) => ({
+      ...prev,
+      [colorName]: {
+        ...(prev[colorName] ?? {}),
+        [size]: [...(prev[colorName]?.[size] ?? [{ qty: "1", priceCents: 0 }]), { qty: "1", priceCents: 0 }],
+      },
+    }));
+  }
+
+  function removeSizeLine(colorName: string, size: string, idx: number) {
+    setColorSizeLines((prev) => ({
+      ...prev,
+      [colorName]: {
+        ...(prev[colorName] ?? {}),
+        [size]: (prev[colorName]?.[size] ?? []).filter((_, i) => i !== idx),
+      },
+    }));
+  }
+
+  function updateSizeLineQty(colorName: string, size: string, idx: number, qty: string) {
+    setColorSizeLines((prev) => ({
+      ...prev,
+      [colorName]: {
+        ...(prev[colorName] ?? {}),
+        [size]: (prev[colorName]?.[size] ?? []).map((l, i) => i === idx ? { ...l, qty } : l),
+      },
+    }));
+  }
+
+  function updateSizeLineCents(colorName: string, size: string, idx: number, priceCents: number) {
+    setColorSizeLines((prev) => ({
+      ...prev,
+      [colorName]: {
+        ...(prev[colorName] ?? {}),
+        [size]: (prev[colorName]?.[size] ?? []).map((l, i) => i === idx ? { ...l, priceCents } : l),
+      },
+    }));
   }
 
   // ── Submit ──
@@ -225,15 +331,18 @@ export function QuickAddVariantModal({
       for (const color of selectedColors) {
         const sizes = colorSizes[color.name] ?? [];
         for (const size of sizes) {
-          variants.push({
-            tempId: crypto.randomUUID(),
-            color: color.name,
-            colorHex: color.hex,
-            size,
-            photoUrl,
-            quantity: Math.max(1, parseInt(colorSizeQtys[color.name]?.[size] ?? "1", 10) || 1),
-            unitCost: parsePriceBR(colorSizePrices[color.name]?.[size] ?? ""),
-          });
+          const lines = colorSizeLines[color.name]?.[size] ?? [{ qty: "1", priceCents: 0 }];
+          for (const line of lines) {
+            variants.push({
+              tempId: crypto.randomUUID(),
+              color: color.name,
+              colorHex: color.hex,
+              size,
+              photoUrl,
+              quantity: Math.max(1, parseInt(line.qty || "1", 10) || 1),
+              unitCost: line.priceCents / 100,
+            });
+          }
         }
       }
 
@@ -251,9 +360,10 @@ export function QuickAddVariantModal({
     }
   }
 
-  // Contagem total de variantes a criar
   const totalVariants = selectedColors.reduce(
-    (s, c) => s + (colorSizes[c.name]?.length ?? 0), 0
+    (s, c) => s + (colorSizes[c.name] ?? []).reduce(
+      (ss, size) => ss + (colorSizeLines[c.name]?.[size]?.length ?? 1), 0
+    ), 0
   );
 
   const activeSizes = activeColorName ? (colorSizes[activeColorName] ?? []) : [];
@@ -366,31 +476,100 @@ export function QuickAddVariantModal({
                 <>
                   {/* Chips das cores selecionadas */}
                   {selectedColors.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedColors.map((c) => {
-                        const isActive = c.name === activeColorName;
-                        const sizesCount = colorSizes[c.name]?.length ?? 0;
-                        return (
-                          <button key={c.name} type="button"
-                            onClick={() => setActiveColorName(c.name)}
-                            className={`flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-full border-2 text-xs font-semibold transition-all ${
-                              isActive ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-blue-300"
-                            }`}
-                          >
-                            <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
-                            <span className="text-slate-700">{c.name}</span>
-                            {sizesCount > 0 && (
-                              <span className="text-[10px] bg-blue-600 text-white rounded-full px-1.5 py-0.5 leading-none">{sizesCount}</span>
-                            )}
-                            <span
-                              onClick={(e) => { e.stopPropagation(); toggleColor(c); }}
-                              className="text-slate-300 hover:text-red-400 transition cursor-pointer"
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedColors.map((c) => {
+                          const isActive = c.name === activeColorName;
+                          const sizesCount = colorSizes[c.name]?.length ?? 0;
+                          return (
+                            <div
+                              key={c.name}
+                              className={`group flex items-center gap-1.5 pl-1.5 pr-1.5 py-1 rounded-full border-2 text-xs font-semibold transition-all ${
+                                isActive ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-blue-300"
+                              }`}
                             >
-                              <X size={11} />
-                            </span>
+                              <button
+                                type="button"
+                                onClick={() => setActiveColorName(c.name)}
+                                className="flex items-center gap-1.5 min-w-0"
+                              >
+                                <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+                                <span className="text-slate-700">{c.name}</span>
+                                {sizesCount > 0 && (
+                                  <span className="text-[10px] bg-blue-600 text-white rounded-full px-1.5 py-0.5 leading-none">{sizesCount}</span>
+                                )}
+                              </button>
+                              {/* Lápis — aparece no hover */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setChipEdit({ colorName: c.name, name: c.name, hex: c.hex });
+                                }}
+                                title="Editar cor"
+                                className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-300 hover:text-blue-500 transition-all"
+                              >
+                                <Pencil size={10} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); toggleColor(c); }}
+                                className="p-0.5 text-slate-300 hover:text-red-400 transition"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Painel de edição do chip */}
+                      {chipEdit && (
+                        <div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => chipColorPickerRef.current?.click()}
+                            className="w-7 h-7 rounded-lg border-2 border-slate-300 shrink-0 shadow-sm hover:border-blue-400 transition"
+                            style={{ backgroundColor: chipEdit.hex }}
+                            title="Clique para escolher a cor"
+                          />
+                          <input
+                            ref={chipColorPickerRef}
+                            type="color"
+                            value={chipEdit.hex}
+                            onChange={(e) => setChipEdit((prev) => prev ? { ...prev, hex: e.target.value } : prev)}
+                            className="sr-only"
+                          />
+                          <input
+                            autoFocus
+                            type="text"
+                            value={chipEdit.name}
+                            onChange={(e) => setChipEdit((prev) => prev ? { ...prev, name: e.target.value.toUpperCase() } : prev)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); confirmChipEdit(); }
+                              if (e.key === "Escape") setChipEdit(null);
+                            }}
+                            placeholder="Nome da cor"
+                            className="flex-1 min-w-0 px-2 py-1 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={confirmChipEdit}
+                            className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition"
+                            title="Salvar"
+                          >
+                            <Check size={12} />
                           </button>
-                        );
-                      })}
+                          <button
+                            type="button"
+                            onClick={() => setChipEdit(null)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                            title="Cancelar"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -508,34 +687,63 @@ export function QuickAddVariantModal({
                     )}
                   </div>
 
-                  {/* Qtd + Custo por tamanho */}
+                  {/* Linhas de Qtd + Custo por tamanho */}
                   {activeSizes.length > 0 && (
                     <div>
                       <div className="flex items-center gap-2 mb-1.5 px-1">
                         <span className="w-12 shrink-0" />
-                        <span className="w-20 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-wide text-center">Qtd.</span>
+                        <span className="w-16 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-wide text-center">Qtd.</span>
                         <span className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide text-center">Custo unit.</span>
+                        <span className="w-10 shrink-0" />
                       </div>
-                      <div className="space-y-2">
-                        {activeSizes.map((size) => (
-                          <div key={size} className="flex items-center gap-2">
-                            <span className="w-12 shrink-0 text-center text-xs font-bold text-white bg-blue-600 rounded-lg py-2">{size}</span>
-                            <input type="number" min="1" placeholder="1"
-                              value={colorSizeQtys[activeColorName]?.[size] ?? ""}
-                              onChange={(e) => setColorSizeQtys((prev) => ({
-                                ...prev,
-                                [activeColorName]: { ...(prev[activeColorName] ?? {}), [size]: e.target.value },
-                              }))}
-                              className="w-20 shrink-0 px-2 py-2 border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-300" />
-                            <input type="text" inputMode="decimal" placeholder="R$ 0,00"
-                              value={colorSizePrices[activeColorName]?.[size] ?? ""}
-                              onChange={(e) => setColorSizePrices((prev) => ({
-                                ...prev,
-                                [activeColorName]: { ...(prev[activeColorName] ?? {}), [size]: e.target.value },
-                              }))}
-                              className="flex-1 min-w-0 px-2 py-2 border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-300" />
-                          </div>
-                        ))}
+                      <div className="space-y-2.5">
+                        {activeSizes.map((size) => {
+                          const lines = colorSizeLines[activeColorName]?.[size] ?? [{ qty: "1", priceCents: 0 }];
+                          return (
+                            <div key={size}>
+                              {lines.map((line, idx) => (
+                                <div key={`${activeColorName}-${size}-${idx}`} className={`flex items-center gap-2 ${idx > 0 ? "mt-1.5 ml-14" : ""}`}>
+                                  {idx === 0 && (
+                                    <span className="w-12 shrink-0 text-center text-xs font-bold text-white bg-blue-600 rounded-lg py-2">{size}</span>
+                                  )}
+                                  <input
+                                    type="number" min="1" placeholder="1"
+                                    value={line.qty}
+                                    onChange={(e) => updateSizeLineQty(activeColorName, size, idx, e.target.value)}
+                                    className="w-16 shrink-0 px-2 py-2 border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-300"
+                                  />
+                                  <PriceInput
+                                    value={line.priceCents}
+                                    onChange={(cents) => updateSizeLineCents(activeColorName, size, idx, cents)}
+                                    className="flex-1 min-w-0 px-2 py-2 border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-300"
+                                  />
+                                  <div className="w-10 shrink-0 flex items-center gap-0.5 justify-end">
+                                    {lines.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeSizeLine(activeColorName, size, idx)}
+                                        className="p-1 text-slate-300 hover:text-red-400 transition"
+                                        title="Remover linha"
+                                      >
+                                        <Minus size={12} />
+                                      </button>
+                                    )}
+                                    {idx === lines.length - 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => addSizeLine(activeColorName, size)}
+                                        className="p-1 text-slate-300 hover:text-blue-500 transition"
+                                        title="Adicionar linha com valor diferente"
+                                      >
+                                        <Plus size={12} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

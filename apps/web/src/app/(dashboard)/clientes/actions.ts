@@ -81,6 +81,22 @@ export async function updateCustomerAction(
   redirect("/clientes");
 }
 
+export type CustomerSuggestion = { id: string; name: string; phone: string | null };
+
+export async function searchCustomersByNameAction(query: string): Promise<CustomerSuggestion[]> {
+  const tenantId = await getTenantId();
+  if (!query || query.length < 1) return [];
+  const { data } = await supabaseAdmin
+    .from("customers")
+    .select("id, name, phone")
+    .eq("tenant_id", tenantId)
+    .is("deleted_at", null)
+    .ilike("name", `%${query}%`)
+    .order("name")
+    .limit(6);
+  return (data ?? []) as CustomerSuggestion[];
+}
+
 export async function deleteCustomerAction(id: string): Promise<void> {
   const tenantId = await getTenantId();
 

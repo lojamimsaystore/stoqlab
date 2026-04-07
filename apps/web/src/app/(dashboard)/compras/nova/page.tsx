@@ -47,6 +47,7 @@ export default async function NovaCompraPage() {
   }
 
   const products = Array.from(productMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  const existingColors = [...new Set((variants ?? []).map((v) => v.color).filter((c): c is string => !!c))];
 
   return (
     <div className="flex flex-col gap-3 lg:h-full lg:min-h-0">
@@ -61,7 +62,7 @@ export default async function NovaCompraPage() {
       </div>
 
       <div className="flex-1 min-h-0">
-        <PurchaseForm suppliers={suppliers ?? []} products={products} categories={categories ?? []} />
+        <PurchaseForm suppliers={suppliers ?? []} products={products} categories={categories ?? []} existingColors={existingColors} />
       </div>
     </div>
   );

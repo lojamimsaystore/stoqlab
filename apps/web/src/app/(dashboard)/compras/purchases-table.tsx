@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, Download, Pencil, Trash2, X, Check } from "lucide-react";
+import { Eye, Download, Pencil, Trash2, X, Check, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@stoqlab/utils";
 import { bulkDeletePurchasesAction } from "./actions";
@@ -23,11 +23,46 @@ type Purchase = {
   suppliers: { name: string } | null;
 };
 
+type SortField = "purchased_at" | "suppliers" | "total_items" | "total";
+type SortDir = "asc" | "desc";
+
 export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function handleSort(field: SortField) {
+    if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortField(field); setSortDir("asc"); }
+  }
+
+  function SortIcon({ field }: { field: SortField }) {
+    if (sortField !== field) return <ChevronsUpDown size={12} className="ml-1 text-slate-300 inline" />;
+    return sortDir === "asc"
+      ? <ChevronUp size={12} className="ml-1 text-blue-500 inline" />
+      : <ChevronDown size={12} className="ml-1 text-blue-500 inline" />;
+  }
+
+  const sortedPurchases = [...purchases].sort((a, b) => {
+    if (!sortField) return 0;
+    const mul = sortDir === "asc" ? 1 : -1;
+    if (sortField === "purchased_at") return mul * a.purchased_at.localeCompare(b.purchased_at);
+    if (sortField === "suppliers") {
+      const aName = (a.suppliers as unknown as { name: string } | null)?.name ?? "";
+      const bName = (b.suppliers as unknown as { name: string } | null)?.name ?? "";
+      return mul * aName.localeCompare(bName);
+    }
+    if (sortField === "total_items") return mul * (a.total_items - b.total_items);
+    if (sortField === "total") {
+      const aT = Number(a.products_cost) + Number(a.freight_cost) + Number(a.other_costs);
+      const bT = Number(b.products_cost) + Number(b.freight_cost) + Number(b.other_costs);
+      return mul * (aT - bT);
+    }
+    return 0;
+  });
 
   const hasSelection = selected.size > 0;
   const allSelected = purchases.length > 0 && selected.size === purchases.length;
@@ -127,17 +162,25 @@ export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
                   title={allSelected ? "Desmarcar todas" : "Selecionar todas"}
                 />
               </th>
-              <th className="px-4 py-3 font-medium text-slate-600">Data</th>
-              <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">Fornecedor</th>
+              <th className="px-4 py-3 font-medium text-slate-600 cursor-pointer select-none" onClick={() => handleSort("purchased_at")}>
+                Data <SortIcon field="purchased_at" />
+              </th>
+              <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell cursor-pointer select-none" onClick={() => handleSort("suppliers")}>
+                Fornecedor <SortIcon field="suppliers" />
+              </th>
               <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell">NF</th>
-              <th className="px-4 py-3 font-medium text-slate-600 text-center">Peças</th>
-              <th className="px-4 py-3 font-medium text-slate-600 text-right">Total</th>
+              <th className="px-4 py-3 font-medium text-slate-600 text-center cursor-pointer select-none" onClick={() => handleSort("total_items")}>
+                Peças <SortIcon field="total_items" />
+              </th>
+              <th className="px-4 py-3 font-medium text-slate-600 text-right cursor-pointer select-none" onClick={() => handleSort("total")}>
+                Total <SortIcon field="total" />
+              </th>
               <th className="px-4 py-3 font-medium text-slate-600">Status</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {purchases.map((p) => {
+            {sortedPurchases.map((p) => {
               const total = Number(p.products_cost) + Number(p.freight_cost) + Number(p.other_costs);
               const supplier = p.suppliers as unknown as { name: string } | null;
               const isSelected = selected.has(p.id);

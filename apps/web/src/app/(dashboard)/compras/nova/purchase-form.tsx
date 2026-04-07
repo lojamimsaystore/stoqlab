@@ -3,7 +3,7 @@
 import { useFormState, useFormStatus } from "react-dom";
 import { useState, useRef, useCallback, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
-import { Plus, Trash2, ShoppingCart, Paperclip, Pencil, Check, X, Camera } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, Paperclip, Pencil, Check, X, Camera, ChevronDown } from "lucide-react";
 
 import { createPurchaseAction } from "../actions";
 import { uploadTempPhotoAction } from "@/app/(dashboard)/produtos/actions";
@@ -16,7 +16,7 @@ type Supplier = { id: string; name: string };
 type Category = { id: string; name: string };
 type Variant = { id: string; color: string; size: string; sku: string };
 type Product = { id: string; name: string; imageUrl?: string | null; categoryId?: string | null; variants: Variant[]; isPending?: boolean };
-type Item = { variantId: string; productId: string; productName: string; imageUrl?: string | null; label: string; quantity: number; unitCost: number };
+type Item = { itemKey: string; variantId: string; productId: string; productName: string; imageUrl?: string | null; label: string; quantity: number; unitCost: number };
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -45,7 +45,6 @@ function CurrencyInput({
   const [cents, setCents] = useState(() => Math.round(value * 100));
   const internalRef = useRef(false);
 
-  // Sync when parent resets value (e.g. after addItem resets unitCost to 0)
   useLayoutEffect(() => {
     if (internalRef.current) {
       internalRef.current = false;
@@ -78,17 +77,13 @@ function CurrencyInput({
   function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
     e.preventDefault();
     const text = e.clipboardData.getData("text").trim();
-    // Aceita formatos: 28,47 | 28.47 | R$ 28,47 | 1.234,56 | 1,234.56
     const cleaned = text.replace(/[^\d,\.]/g, "");
     let num = 0;
     if (/^\d+,\d{2}$/.test(cleaned)) {
-      // Formato BR: 28,47
       num = parseFloat(cleaned.replace(",", "."));
     } else if (/^\d{1,3}(\.\d{3})+(,\d{2})?$/.test(cleaned)) {
-      // Formato BR com milhar: 1.234,56
       num = parseFloat(cleaned.replace(/\./g, "").replace(",", "."));
     } else {
-      // Tenta parse direto (28.47 ou 28)
       num = parseFloat(cleaned.replace(",", ".")) || 0;
     }
     const newCents = Math.min(Math.round(num * 100), 99999999);
@@ -120,10 +115,12 @@ export function PurchaseForm({
   suppliers: initialSuppliers,
   products: initialProducts,
   categories,
+  existingColors = [],
 }: {
   suppliers: Supplier[];
   products: Product[];
   categories: Category[];
+  existingColors?: string[];
 }) {
   const [state, formAction] = useFormState(createPurchaseAction, {});
   const invoiceFileRef = useRef<HTMLInputElement>(null);
@@ -140,96 +137,134 @@ export function PurchaseForm({
   const [selectedProductId, setSelectedProductId] = useState("");
   const [selectedVariantId, setSelectedVariantId] = useState("");
   const [freightCost, setFreightCost] = useState(0);
-  const [productSearch, setProductSearch] = useState("");
-  const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
+  const [editingItemKey, setEditingItemKey] = useState<string | null>(null);
   const [editQty, setEditQty] = useState(1);
   const [editUnitCost, setEditUnitCost] = useState(0);
   const [pendingProducts, setPendingProducts] = useState<Array<{tempId: string; name: string; categoryId?: string}>>([]);
   const [pendingVariants, setPendingVariants] = useState<Array<{tempId: string; productTempId: string; color: string; colorHex?: string; size: string; photoUrl?: string}>>([]);
 
+  // Product combobox
+  const [productComboOpen, setProductComboOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
+  const productComboRef = useRef<HTMLDivElement>(null);
+
+  // Qty/cost dialog for existing variants
+  const [qtyPriceDialog, setQtyPriceDialog] = useState<{
+    variantId: string; productId: string; productName: string; label: string; imageUrl?: string | null;
+  } | null>(null);
+  const [dialogQty, setDialogQty] = useState(1);
+  const [dialogCost, setDialogCost] = useState(0);
+
   const selectedProduct = products.find((p) => p.id === selectedProductId);
   const selectedVariant = selectedProduct?.variants.find((v) => v.id === selectedVariantId);
-  // Produto pendente (criado via modal, ainda não está no dropdown de produtos)
   const selectedPendingProduct = pendingProducts.find((p) => p.tempId === selectedProductId && !selectedProduct);
   const effectiveProductName = selectedProduct?.name ?? selectedPendingProduct?.name ?? "";
 
-  function addItem() {
-    if (!selectedVariant) return;
-    const exists = items.find((i) => i.variantId === selectedVariantId);
-    if (exists) {
-      setItems(items.map((i) =>
-        i.variantId === selectedVariantId
-          ? { ...i, quantity: i.quantity + 1 }
-          : i
-      ));
-    } else {
-      const pendingVariant = pendingVariants.find((v) => v.tempId === selectedVariantId);
-      const imageUrl = pendingVariant?.photoUrl ?? selectedProduct!.imageUrl;
-      setItems([...items, {
-        variantId: selectedVariantId,
-        productId: selectedProductId,
-        productName: selectedProduct!.name,
-        imageUrl,
-        label: `${selectedVariant.color} · ${selectedVariant.size}`,
-        quantity: 1,
-        unitCost: 0,
-      }]);
+  // Close combobox on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (productComboRef.current && !productComboRef.current.contains(e.target as Node)) {
+        setProductComboOpen(false);
+      }
     }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredProducts = products.filter((p) =>
+    !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  // Suggested category for the new product modal based on search text
+  const suggestedCategoryId = products.find(
+    (p) => productSearch && p.name.toLowerCase().includes(productSearch.toLowerCase())
+  )?.categoryId ?? "";
+
+  function handleAddClick() {
+    if (!selectedVariant) return;
+    // Open qty/cost dialog for existing variants
+    setQtyPriceDialog({
+      variantId: selectedVariantId,
+      productId: selectedProductId,
+      productName: selectedProduct!.name,
+      label: `${selectedVariant.color} · ${selectedVariant.size}`,
+      imageUrl: selectedProduct!.imageUrl,
+    });
+    setDialogQty(1);
+    setDialogCost(0);
+  }
+
+  function confirmQtyPrice() {
+    if (!qtyPriceDialog || dialogQty < 1) return;
+    const { variantId, productId, productName, label, imageUrl } = qtyPriceDialog;
+    setItems((prev) => [...prev, {
+      itemKey: crypto.randomUUID(),
+      variantId,
+      productId,
+      productName,
+      imageUrl,
+      label,
+      quantity: dialogQty,
+      unitCost: dialogCost,
+    }]);
+    setQtyPriceDialog(null);
     setSelectedProductId("");
     setSelectedVariantId("");
     setProductSearch("");
   }
 
-  function removeItem(variantId: string) {
-    setItems(items.filter((i) => i.variantId !== variantId));
+  function removeItem(itemKey: string) {
+    setItems(items.filter((i) => i.itemKey !== itemKey));
   }
 
   function startEdit(item: Item) {
-    setEditingVariantId(item.variantId);
+    setEditingItemKey(item.itemKey);
     setEditQty(item.quantity);
     setEditUnitCost(item.unitCost);
   }
 
   function saveEdit() {
-    if (!editingVariantId || editQty < 1) return;
+    if (!editingItemKey || editQty < 1) return;
     setItems(items.map((i) =>
-      i.variantId === editingVariantId ? { ...i, quantity: editQty, unitCost: editUnitCost } : i
+      i.itemKey === editingItemKey ? { ...i, quantity: editQty, unitCost: editUnitCost } : i
     ));
-    setEditingVariantId(null);
+    setEditingItemKey(null);
   }
 
   function cancelEdit() {
-    setEditingVariantId(null);
+    setEditingItemKey(null);
   }
 
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const [uploadingImageForVariant, setUploadingImageForVariant] = useState<string | null>(null);
+  const [uploadingImageForKey, setUploadingImageForKey] = useState<string | null>(null);
 
-  const handleImageEdit = useCallback((variantId: string) => {
-    setUploadingImageForVariant(variantId);
+  const handleImageEdit = useCallback((itemKey: string) => {
+    setUploadingImageForKey(itemKey);
     imageInputRef.current?.click();
   }, []);
 
   async function handleImageFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    const variantId = uploadingImageForVariant;
-    if (!file || !variantId) return;
+    const key = uploadingImageForKey;
+    if (!file || !key) return;
     e.target.value = "";
     try {
       const fd = new FormData();
       fd.append("photo", file);
       const url = await uploadTempPhotoAction(fd);
       if (!url) return;
-      // Atualiza a imagem no item da lista
       setItems((prev) => prev.map((i) =>
-        i.variantId === variantId ? { ...i, imageUrl: url } : i
+        i.itemKey === key ? { ...i, imageUrl: url } : i
       ));
-      // Atualiza photoUrl na variação pendente (se for pendente)
-      setPendingVariants((prev) => prev.map((pv) =>
-        pv.tempId === variantId ? { ...pv, photoUrl: url } : pv
-      ));
+      // Update photoUrl in pending variant if applicable
+      const item = items.find((i) => i.itemKey === key);
+      if (item) {
+        setPendingVariants((prev) => prev.map((pv) =>
+          pv.tempId === item.variantId ? { ...pv, photoUrl: url } : pv
+        ));
+      }
     } finally {
-      setUploadingImageForVariant(null);
+      setUploadingImageForKey(null);
     }
   }
 
@@ -251,18 +286,20 @@ export function PurchaseForm({
         open={productModalOpen}
         onClose={() => setProductModalOpen(false)}
         defaultName={productSearch}
+        defaultCategoryId={suggestedCategoryId}
         categories={categories}
         onCreated={(p) => {
-          // Produto pendente: rastreado em pendingProducts mas NÃO adicionado ao dropdown
           setPendingProducts((prev) => [...prev, { tempId: p.tempId, name: p.name, categoryId: p.categoryId }]);
           setSelectedProductId(p.tempId);
           setSelectedVariantId("");
+          setProductSearch("");
         }}
       />
       <QuickAddProductModal
         open={productEditModalOpen}
         onClose={() => setProductEditModalOpen(false)}
         editProduct={pendingProducts.find((p) => p.tempId === selectedProductId)}
+        categories={categories}
         onUpdated={(p) => {
           setProducts((prev) => prev.map((prod) =>
             prod.id === p.tempId ? { ...prod, name: p.name } : prod
@@ -280,12 +317,12 @@ export function PurchaseForm({
         onClose={() => setVariantModalOpen(false)}
         productId={selectedProductId}
         productName={effectiveProductName}
+        existingColorNames={existingColors}
         onCreated={(variants: CreatedVariant[]) => {
           const prodId   = selectedProductId;
           const prodName = effectiveProductName;
           const prodImage = selectedProduct?.imageUrl ?? null;
 
-          // Rastreia variantes pendentes para criação server-side
           setPendingVariants((prev) => [...prev, ...variants.map((v) => ({
             tempId: v.tempId,
             productTempId: prodId,
@@ -295,23 +332,21 @@ export function PurchaseForm({
             photoUrl: v.photoUrl,
           }))]);
 
-          // Adiciona diretamente na tabela de itens — NÃO aparece nos dropdowns
+          // Add all variants directly — each gets a unique itemKey
           setItems((prev) => {
-            const toAdd = variants
-              .filter((v) => !prev.some((i) => i.variantId === v.tempId))
-              .map((v) => ({
-                variantId: v.tempId,
-                productId: prodId,
-                productName: prodName,
-                imageUrl: v.photoUrl ?? prodImage,
-                label: `${v.color} · ${v.size}`,
-                quantity: v.quantity,
-                unitCost: v.unitCost,
-              }));
-            return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+            const toAdd = variants.map((v) => ({
+              itemKey: crypto.randomUUID(),
+              variantId: v.tempId,
+              productId: prodId,
+              productName: prodName,
+              imageUrl: v.photoUrl ?? prodImage,
+              label: `${v.color} · ${v.size}`,
+              quantity: v.quantity,
+              unitCost: v.unitCost,
+            }));
+            return [...prev, ...toAdd];
           });
 
-          // Limpa seleção após adicionar
           setSelectedProductId("");
           setSelectedVariantId("");
         }}
@@ -321,6 +356,7 @@ export function PurchaseForm({
         onClose={() => setVariantEditModalOpen(false)}
         productId={selectedProductId}
         productName={selectedProduct?.name ?? ""}
+        existingColorNames={existingColors}
         editVariant={pendingVariants.find((v) => v.tempId === selectedVariantId)}
         onUpdated={(v) => {
           setProducts((prev) => prev.map((p) =>
@@ -338,6 +374,60 @@ export function PurchaseForm({
           ));
         }}
       />
+
+      {/* Qty/Cost dialog for existing variants */}
+      {qtyPriceDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-xs p-5 space-y-4">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold text-slate-900 text-sm">{qtyPriceDialog.productName}</p>
+                <p className="text-xs text-slate-500">{qtyPriceDialog.label}</p>
+              </div>
+              <button type="button" onClick={() => setQtyPriceDialog(null)} className="text-slate-400 hover:text-slate-600 mt-0.5">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Quantidade</label>
+                <input
+                  type="number" min="1" autoFocus
+                  value={dialogQty}
+                  onChange={(e) => setDialogQty(Math.max(1, Number(e.target.value)))}
+                  onKeyDown={(e) => { if (e.key === "Enter") confirmQtyPrice(); }}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Custo unit.</label>
+                <CurrencyInput
+                  name=""
+                  value={dialogCost}
+                  onChange={setDialogCost}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={confirmQtyPrice}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition"
+              >
+                Adicionar
+              </button>
+              <button
+                type="button"
+                onClick={() => setQtyPriceDialog(null)}
+                className="px-4 text-sm text-slate-500 hover:text-slate-700 font-medium"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <form action={formAction} encType="multipart/form-data" className="flex flex-col lg:flex-row gap-4 lg:h-full">
 
@@ -466,7 +556,7 @@ export function PurchaseForm({
             </div>
           </div>
 
-          {/* Itens da compra — cresce para preencher o espaço disponível */}
+          {/* Itens da compra */}
           <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-3 lg:flex-1 lg:min-h-0">
             <h2 className="shrink-0 text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Itens da compra
@@ -474,21 +564,11 @@ export function PurchaseForm({
 
             {/* Linha de adicionar item */}
             <div className="shrink-0 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
-              {/* Produto */}
+              {/* Produto (combobox) */}
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Produto</label>
 
-                {products.length > 10 && !selectedPendingProduct && (
-                  <input
-                    type="text"
-                    value={productSearch}
-                    onChange={(e) => { setProductSearch(e.target.value); setSelectedProductId(""); setSelectedVariantId(""); }}
-                    placeholder="Buscar produto..."
-                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 placeholder:text-slate-400 mb-1"
-                  />
-                )}
-
-                {/* Produto pendente: mostra badge no lugar do dropdown */}
+                {/* Produto pendente: mostra badge no lugar do combobox */}
                 {selectedPendingProduct ? (
                   <div className="flex items-center gap-1.5">
                     <div className="flex-1 flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 font-medium">
@@ -505,7 +585,7 @@ export function PurchaseForm({
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setSelectedProductId(""); setSelectedVariantId(""); }}
+                      onClick={() => { setSelectedProductId(""); setSelectedVariantId(""); setProductSearch(""); }}
                       title="Cancelar"
                       className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-400 transition shrink-0"
                     >
@@ -514,21 +594,52 @@ export function PurchaseForm({
                   </div>
                 ) : (
                   <div className="flex gap-1.5">
-                    <select
-                      value={selectedProductId}
-                      onChange={(e) => { setSelectedProductId(e.target.value); setSelectedVariantId(""); }}
-                      className="flex-1 min-w-0 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
-                    >
-                      <option value="">Selecione o produto...</option>
-                      {products
-                        .filter((p) =>
-                          p.id === selectedProductId ||
-                          (products.length <= 10 || p.name.toLowerCase().includes(productSearch.toLowerCase()))
-                        )
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                    </select>
+                    {/* Combobox */}
+                    <div className="flex-1 relative" ref={productComboRef}>
+                      <button
+                        type="button"
+                        onClick={() => { setProductComboOpen((o) => !o); }}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <span className={selectedProduct ? "text-slate-800 truncate" : "text-slate-400"}>
+                          {selectedProduct?.name ?? "Selecione o produto..."}
+                        </span>
+                        <ChevronDown size={13} className="text-slate-400 shrink-0" />
+                      </button>
+                      {productComboOpen && (
+                        <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+                          <div className="p-2 border-b border-slate-100">
+                            <input
+                              autoFocus
+                              type="text"
+                              value={productSearch}
+                              onChange={(e) => setProductSearch(e.target.value)}
+                              placeholder="Buscar produto..."
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div className="max-h-48 overflow-y-auto">
+                            {filteredProducts.length > 0 ? filteredProducts.map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedProductId(p.id);
+                                  setSelectedVariantId("");
+                                  setProductComboOpen(false);
+                                  setProductSearch("");
+                                }}
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition ${selectedProductId === p.id ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-800"}`}
+                              >
+                                {p.name}
+                              </button>
+                            )) : (
+                              <p className="px-3 py-2 text-sm text-slate-400">Nenhum produto encontrado</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => setProductModalOpen(true)}
@@ -541,11 +652,10 @@ export function PurchaseForm({
                 )}
               </div>
 
-              {/* Detalhes (variação) — só para produtos existentes */}
+              {/* Detalhes (variação) */}
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Detalhes</label>
                 {selectedPendingProduct ? (
-                  /* Produto novo: botão "+" abre modal direto, sem dropdown de variantes */
                   <button
                     type="button"
                     onClick={() => setVariantModalOpen(true)}
@@ -583,7 +693,7 @@ export function PurchaseForm({
               {/* Botão */}
               <button
                 type="button"
-                onClick={addItem}
+                onClick={handleAddClick}
                 disabled={!selectedVariantId}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:bg-slate-50 disabled:text-slate-300 transition whitespace-nowrap self-end"
               >
@@ -592,7 +702,7 @@ export function PurchaseForm({
               </button>
             </div>
 
-            {/* Tabela — área elástica com scroll interno no desktop */}
+            {/* Tabela */}
             <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
               {items.length > 0 ? (
                 <div className="border border-slate-100 rounded-lg overflow-hidden">
@@ -608,16 +718,16 @@ export function PurchaseForm({
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {items.map((item) => {
-                        const isEditing = editingVariantId === item.variantId;
+                        const isEditing = editingItemKey === item.itemKey;
                         return (
-                          <tr key={item.variantId} className="hover:bg-slate-50/50">
+                          <tr key={item.itemKey} className="hover:bg-slate-50/50">
                             <td className="px-4 py-2">
                               <p className="font-medium text-slate-900">{item.productName}</p>
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <button
                                   type="button"
-                                  onClick={() => handleImageEdit(item.variantId)}
-                                  disabled={uploadingImageForVariant === item.variantId}
+                                  onClick={() => handleImageEdit(item.itemKey)}
+                                  disabled={uploadingImageForKey === item.itemKey}
                                   title="Trocar imagem"
                                   className="group relative w-5 shrink-0 rounded overflow-hidden bg-slate-100 focus:outline-none"
                                   style={{ aspectRatio: "3/4" }}
@@ -629,7 +739,7 @@ export function PurchaseForm({
                                     <div className="w-full h-full bg-slate-100" />
                                   )}
                                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition flex items-center justify-center">
-                                    {uploadingImageForVariant === item.variantId ? (
+                                    {uploadingImageForKey === item.itemKey ? (
                                       <div className="w-2 h-2 border border-white border-t-transparent rounded-full animate-spin" />
                                     ) : (
                                       <Camera size={8} className="text-white opacity-0 group-hover:opacity-100 transition" />
@@ -682,7 +792,7 @@ export function PurchaseForm({
                                   <button type="button" onClick={() => startEdit(item)} className="text-slate-300 hover:text-blue-400 transition">
                                     <Pencil size={14} />
                                   </button>
-                                  <button type="button" onClick={() => removeItem(item.variantId)} className="text-slate-300 hover:text-red-400 transition">
+                                  <button type="button" onClick={() => removeItem(item.itemKey)} className="text-slate-300 hover:text-red-400 transition">
                                     <Trash2 size={14} />
                                   </button>
                                 </div>
@@ -702,7 +812,7 @@ export function PurchaseForm({
               )}
             </div>
 
-            {/* Observações — dentro do card de itens para economizar espaço */}
+            {/* Observações */}
             <div className="shrink-0 border-t border-slate-100 pt-3">
               <label className="block text-xs font-medium text-slate-500 mb-1.5">Observações</label>
               <textarea

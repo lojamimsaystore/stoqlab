@@ -1,8 +1,11 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import type { CustomerState } from "./actions";
+import { User } from "lucide-react";
+import type { CustomerState, CustomerSuggestion } from "./actions";
+import { searchCustomersByNameAction } from "./actions";
 
 function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -14,7 +17,15 @@ function SubmitButton({ label }: { label: string }) {
   );
 }
 
-type Customer = { name: string; phone?: string | null; email?: string | null; cpf?: string | null; birthdate?: string | null; address?: string | null; notes?: string | null };
+type Customer = {
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  cpf?: string | null;
+  birthdate?: string | null;
+  address?: string | null;
+  notes?: string | null;
+};
 
 export function CustomerForm({
   action, defaultValues, submitLabel,
@@ -25,17 +36,102 @@ export function CustomerForm({
 }) {
   const [state, formAction] = useFormState(action, {});
 
+  // Autocomplete de nome
+  const [nameValue, setNameValue] = useState(defaultValues?.name ?? "");
+  const [suggestions, setSuggestions] = useState<CustomerSuggestion[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Fecha o dropdown ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
+    setNameValue(value);
+    setShowDropdown(false);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (value.trim().length < 1) {
+      setSuggestions([]);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      const results = await searchCustomersByNameAction(value.trim());
+      setSuggestions(results);
+      setShowDropdown(results.length > 0);
+    }, 250);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Escape") setShowDropdown(false);
+  }
+
   return (
     <form action={formAction} className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-slate-700 mb-1">Nome <span className="text-red-500">*</span></label>
-          <input name="name" required defaultValue={defaultValues?.name}
+
+        {/* Campo Nome com autocomplete */}
+        <div className="sm:col-span-2 relative" ref={wrapperRef}>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Nome <span className="text-red-500">*</span>
+          </label>
+          <input
+            name="name"
+            required
+            value={nameValue}
+            onChange={handleNameChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Ex: Maria Silva"
             autoCapitalize="words"
-            style={{ textTransform: "none" }} />
+            style={{ textTransform: "none" }}
+            autoComplete="off"
+          />
+
+          {/* Dropdown de sugestões */}
+          {showDropdown && (
+            <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+              <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Clientes encontrados
+              </p>
+              {suggestions.map((s) => (
+                <Link
+                  key={s.id}
+                  href={`/clientes/${s.id}/editar`}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 transition-colors border-t border-slate-100 first:border-0"
+                  onClick={() => setShowDropdown(false)}
+                >
+                  <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                    <User size={13} className="text-slate-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{s.name}</p>
+                    {s.phone && (
+                      <p className="text-xs text-slate-400">{s.phone}</p>
+                    )}
+                  </div>
+                  <span className="text-xs text-blue-500 font-medium shrink-0">Ver perfil</span>
+                </Link>
+              ))}
+              <p className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100 bg-slate-50">
+                Não encontrou? Continue digitando para criar um novo cliente.
+              </p>
+            </div>
+          )}
         </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Telefone / WhatsApp</label>
           <input name="phone" defaultValue={defaultValues?.phone ?? ""}
@@ -67,7 +163,7 @@ export function CustomerForm({
         </div>
         <div className="sm:col-span-2">
           <label className="block text-sm font-medium text-slate-700 mb-1">Observações</label>
-          <textarea name="notes" defaultValue={defaultValues?.notes ?? ""} rows={2} resize-none
+          <textarea name="notes" defaultValue={defaultValues?.notes ?? ""} rows={2}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             placeholder="Preferências, histórico, informações adicionais..." />
         </div>

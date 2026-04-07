@@ -95,7 +95,7 @@ export default async function VendasPage({
           )}
         </div>
       ) : (
-        <SalesTable sales={filtered as Parameters<typeof SalesTable>[0]["sales"]} />
+        <SalesTable sales={filtered as unknown as Parameters<typeof SalesTable>[0]["sales"]} />
       )}
     </div>
   );

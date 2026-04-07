@@ -32,7 +32,9 @@ export function CustomerForm({
           <label className="block text-sm font-medium text-slate-700 mb-1">Nome <span className="text-red-500">*</span></label>
           <input name="name" required defaultValue={defaultValues?.name}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Nome completo" />
+            placeholder="Ex: Maria Silva"
+            autoCapitalize="words"
+            style={{ textTransform: "none" }} />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Telefone / WhatsApp</label>

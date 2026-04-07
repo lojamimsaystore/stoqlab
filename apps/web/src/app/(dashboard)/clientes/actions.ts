@@ -8,7 +8,14 @@ import { getTenantId } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 
 const customerSchema = z.object({
-  name: z.string().min(1, "Nome obrigatório").max(150),
+  name: z
+    .string()
+    .min(1, "Nome obrigatório")
+    .max(150)
+    .refine(
+      (val) => val.trim().split(/\s+/).filter(Boolean).length >= 2,
+      "Informe o nome completo (nome e sobrenome)"
+    ),
   phone: z.string().max(30).optional(),
   email: z.string().email("E-mail inválido").optional().or(z.literal("")),
   cpf: z.string().max(20).optional(),

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, Download, Trash2, X, Check } from "lucide-react";
+import { Eye, Download, Pencil, Trash2, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@stoqlab/utils";
 import { bulkDeletePurchasesAction } from "./actions";
@@ -20,7 +20,7 @@ type Purchase = {
   products_cost: string;
   freight_cost: string;
   other_costs: string;
-  suppliers: { name: string }[] | null;
+  suppliers: { name: string } | null;
 };
 
 export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
@@ -139,7 +139,7 @@ export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
           <tbody className="divide-y divide-slate-100">
             {purchases.map((p) => {
               const total = Number(p.products_cost) + Number(p.freight_cost) + Number(p.other_costs);
-              const supplier = (p.suppliers as unknown as Array<{ name: string }> | null)?.[0] ?? null;
+              const supplier = p.suppliers as unknown as { name: string } | null;
               const isSelected = selected.has(p.id);
 
               return (
@@ -182,6 +182,12 @@ export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
                         className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded">
                         <Eye size={15} />
                       </Link>
+                      {!hasSelection && (
+                        <Link href={`/compras/${p.id}/editar`} title="Editar compra" aria-label="Editar compra"
+                          className="text-slate-400 hover:text-amber-600 transition-colors p-1 rounded">
+                          <Pencil size={15} />
+                        </Link>
+                      )}
                       {!hasSelection && <DeletePurchaseButton id={p.id} />}
                     </div>
                   </td>

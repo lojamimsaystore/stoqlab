@@ -327,6 +327,168 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
   redirect("/compras");
 }
 
+const updateItemSchema = z.object({
+  variantId: z.string().uuid(),
+  quantity: z.number().int().min(1),
+  unitCost: z.number().min(0),
+});
+
+const updatePurchaseSchema = z.object({
+  supplierId: z.string().uuid().optional(),
+  invoiceNumber: z.string().min(1, "Nº nota fiscal obrigatório").max(60),
+  purchasedAt: z.string().min(1, "Data obrigatória"),
+  paymentMethod: z.enum(PAYMENT_METHODS, { errorMap: () => ({ message: "Forma de pagamento obrigatória" }) }),
+  freightCost: z.number().min(0).default(0),
+  otherCosts: z.number().min(0).default(0),
+  notes: z.string().max(500).optional(),
+  items: z.array(updateItemSchema).min(1, "Adicione ao menos um item"),
+});
+
+export type PurchaseUpdateState = { error?: string };
+
+export async function updatePurchaseAction(
+  id: string,
+  _prev: PurchaseUpdateState,
+  formData: FormData
+): Promise<PurchaseUpdateState> {
+  const tenantId = await getTenantId();
+
+  let items: unknown[];
+  try {
+    items = JSON.parse(formData.get("items") as string);
+  } catch {
+    return { error: "Itens inválidos." };
+  }
+
+  const parsed = updatePurchaseSchema.safeParse({
+    supplierId: formData.get("supplierId") || undefined,
+    invoiceNumber: formData.get("invoiceNumber"),
+    purchasedAt: formData.get("purchasedAt"),
+    paymentMethod: formData.get("paymentMethod") || undefined,
+    freightCost: Number(formData.get("freightCost") || 0),
+    otherCosts: Number(formData.get("otherCosts") || 0),
+    notes: formData.get("notes") || undefined,
+    items,
+  });
+
+  if (!parsed.success) return { error: parsed.error.errors[0].message };
+
+  // Busca compra atual com itens
+  const { data: currentPurchase } = await supabaseAdmin
+    .from("purchases")
+    .select("*, purchase_items(variant_id, quantity, unit_cost)")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (!currentPurchase) return { error: "Compra não encontrada." };
+
+  const locationId = (currentPurchase as unknown as { location_id: string }).location_id;
+  const currentItems = currentPurchase.purchase_items as { variant_id: string; quantity: number; unit_cost: string }[];
+
+  // Reverte estoque dos itens antigos (desfaz a entrada)
+  for (const item of currentItems ?? []) {
+    const { data: inv } = await supabaseAdmin
+      .from("inventory")
+      .select("id, quantity")
+      .eq("variant_id", item.variant_id)
+      .eq("location_id", locationId)
+      .maybeSingle();
+
+    if (inv) {
+      const newQty = Math.max(0, Number(inv.quantity) - Number(item.quantity));
+      await supabaseAdmin
+        .from("inventory")
+        .update({ quantity: newQty })
+        .eq("id", inv.id);
+    }
+  }
+
+  const { supplierId, invoiceNumber, purchasedAt, paymentMethod, freightCost, otherCosts, notes } = parsed.data;
+
+  const totalItems = parsed.data.items.reduce((s, i) => s + i.quantity, 0);
+  const productsCost = parsed.data.items.reduce((s, i) => s + i.quantity * i.unitCost, 0);
+  const extraCostPerItem = totalItems > 0 ? (freightCost + otherCosts) / totalItems : 0;
+
+  // Atualiza a compra
+  await supabaseAdmin
+    .from("purchases")
+    .update({
+      supplier_id: supplierId ?? null,
+      invoice_number: invoiceNumber,
+      purchased_at: new Date(purchasedAt).toISOString(),
+      payment_method: paymentMethod,
+      products_cost: productsCost.toFixed(2),
+      freight_cost: freightCost.toFixed(2),
+      other_costs: otherCosts.toFixed(2),
+      total_items: totalItems,
+      notes: notes ?? null,
+    })
+    .eq("id", id)
+    .eq("tenant_id", tenantId);
+
+  // Remove itens e movimentos antigos
+  await supabaseAdmin.from("inventory_movements").delete().eq("reference_id", id);
+  await supabaseAdmin.from("purchase_items").delete().eq("purchase_id", id);
+
+  // Insere novos itens
+  const purchaseItems = parsed.data.items.map((item) => ({
+    purchase_id: id,
+    variant_id: item.variantId,
+    quantity: item.quantity,
+    unit_cost: item.unitCost.toFixed(4),
+    real_unit_cost: (item.unitCost + extraCostPerItem).toFixed(4),
+  }));
+  await supabaseAdmin.from("purchase_items").insert(purchaseItems);
+
+  // Atualiza estoque com novos itens
+  for (const item of parsed.data.items) {
+    const { data: inv } = await supabaseAdmin
+      .from("inventory")
+      .select("id, quantity")
+      .eq("variant_id", item.variantId)
+      .eq("location_id", locationId)
+      .maybeSingle();
+
+    if (inv) {
+      await supabaseAdmin
+        .from("inventory")
+        .update({ quantity: Number(inv.quantity) + item.quantity })
+        .eq("id", inv.id);
+    } else {
+      await supabaseAdmin.from("inventory").insert({
+        tenant_id: tenantId,
+        variant_id: item.variantId,
+        location_id: locationId,
+        quantity: item.quantity,
+      });
+    }
+
+    await supabaseAdmin.from("inventory_movements").insert({
+      tenant_id: tenantId,
+      variant_id: item.variantId,
+      location_id: locationId,
+      quantity_delta: item.quantity,
+      movement_type: "purchase",
+      reference_id: id,
+      note: `Compra ${invoiceNumber ?? id.slice(0, 8)} (editada)`,
+    });
+  }
+
+  await writeAuditLog({
+    tenantId,
+    action: "purchase.updated",
+    tableName: "purchases",
+    recordId: id,
+    newData: { invoice_number: invoiceNumber, total_items: totalItems } as Record<string, unknown>,
+  });
+
+  revalidatePath("/compras");
+  revalidatePath("/estoque");
+  revalidatePath("/produtos");
+  redirect("/compras");
+}
+
 export async function updatePurchaseStatusAction(
   id: string,
   status: "received" | "confirmed" | "cancelled"

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, Trash2, X, Check } from "lucide-react";
+import { Eye, Pencil, Trash2, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@stoqlab/utils";
 import { bulkCancelSalesAction } from "./actions";
@@ -49,7 +49,7 @@ type Sale = {
   gross_margin: string | null;
   sold_at: string;
   notes: string | null;
-  customers: { name: string }[] | null;
+  customers: { name: string } | null;
   locations: { name: string } | null;
 };
 
@@ -176,7 +176,7 @@ export function SalesTable({ sales }: { sales: Sale[] }) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {sales.map((s) => {
-                const customer = (s.customers as unknown as Array<{ name: string }> | null)?.[0] ?? null;
+                const customer = s.customers as unknown as { name: string } | null;
                 const location = s.locations as unknown as { name: string } | null;
                 const installmentLabel = parseInstallments(s.notes ?? null);
                 const isSelected = selected.has(s.id);
@@ -225,6 +225,12 @@ export function SalesTable({ sales }: { sales: Sale[] }) {
                           className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded inline-flex">
                           <Eye size={15} />
                         </Link>
+                        {!hasSelection && s.status === "completed" && (
+                          <Link href={`/vendas/${s.id}/editar`} title="Editar venda" aria-label="Editar venda"
+                            className="text-slate-400 hover:text-amber-600 transition-colors p-1 rounded inline-flex">
+                            <Pencil size={15} />
+                          </Link>
+                        )}
                         {!hasSelection && s.status === "completed" && <CancelSaleButton id={s.id} />}
                       </div>
                     </td>

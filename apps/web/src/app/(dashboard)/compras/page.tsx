@@ -26,8 +26,39 @@ export default async function ComprasPage({
   if (status && status !== "all") {
     query = query.eq("status", status);
   }
+
   if (q) {
-    query = query.or(`invoice_number.ilike.%${q}%`);
+    // Busca por nome de produto: produto → variação → item de compra
+    const { data: productMatches } = await supabaseAdmin
+      .from("products")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .ilike("name", `%${q}%`);
+
+    let productPurchaseIds: string[] = [];
+    if (productMatches && productMatches.length > 0) {
+      const { data: variantRows } = await supabaseAdmin
+        .from("product_variants")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .in("product_id", productMatches.map((p) => p.id))
+        .is("deleted_at", null);
+
+      if (variantRows && variantRows.length > 0) {
+        const { data: itemRows } = await supabaseAdmin
+          .from("purchase_items")
+          .select("purchase_id")
+          .in("variant_id", variantRows.map((v) => v.id));
+        productPurchaseIds = [...new Set((itemRows ?? []).map((i) => i.purchase_id as string))];
+      }
+    }
+
+    if (productPurchaseIds.length > 0) {
+      query = query.or(`invoice_number.ilike.%${q}%,id.in.(${productPurchaseIds.join(",")})`);
+    } else {
+      query = query.ilike("invoice_number", `%${q}%`);
+    }
   }
 
   const { data: purchases } = await query;
@@ -54,7 +85,7 @@ export default async function ComprasPage({
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-2">
         <Suspense fallback={null}>
-          <SearchInput placeholder="Buscar por número de NF…" className="flex-1" />
+          <SearchInput placeholder="Buscar por NF ou nome do produto…" className="flex-1" />
         </Suspense>
         <Suspense fallback={null}>
           <StatusFilter />
@@ -81,7 +112,7 @@ export default async function ComprasPage({
           )}
         </div>
       ) : (
-        <PurchasesTable purchases={purchases as Parameters<typeof PurchasesTable>[0]["purchases"]} />
+        <PurchasesTable purchases={purchases as unknown as Parameters<typeof PurchasesTable>[0]["purchases"]} />
       )}
     </div>
   );

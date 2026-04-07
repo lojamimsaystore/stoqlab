@@ -55,6 +55,8 @@ export function NewCustomerModal({ initial, onConfirm, onClose }: Props) {
   async function handleConfirm() {
     const fieldErrors: string[] = [];
     if (!name.trim()) fieldErrors.push("Nome é obrigatório.");
+    else if (name.trim().split(/\s+/).filter(Boolean).length < 2)
+      fieldErrors.push("Informe o nome completo (nome e sobrenome).");
     if (fieldErrors.length > 0) { setErrors(fieldErrors); return; }
 
     setLoading(true);
@@ -111,6 +113,8 @@ export function NewCustomerModal({ initial, onConfirm, onClose }: Props) {
                 value={name}
                 onChange={(e) => { setName(e.target.value); setErrors([]); }}
                 placeholder="Ex: Maria Silva"
+                autoCapitalize="words"
+                style={{ textTransform: "none" }}
                 className="w-full pl-8 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-300"
               />
             </div>

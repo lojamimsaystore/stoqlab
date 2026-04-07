@@ -239,6 +239,199 @@ export async function createSaleAction(
   redirect("/vendas");
 }
 
+export async function updateSaleAction(
+  id: string,
+  _prev: SaleState,
+  formData: FormData
+): Promise<SaleState> {
+  const tenantId = await getTenantId();
+
+  let items: unknown[];
+  try {
+    items = JSON.parse(formData.get("items") as string);
+  } catch {
+    return { error: "Itens inválidos." };
+  }
+
+  const parsed = saleSchema.safeParse({
+    paymentMethod: formData.get("paymentMethod"),
+    channel: formData.get("channel") || "store",
+    notes: formData.get("notes") || undefined,
+    items,
+  });
+
+  if (!parsed.success) return { error: parsed.error.errors[0].message };
+
+  // Busca venda atual com itens
+  const { data: currentSale } = await supabaseAdmin
+    .from("sales")
+    .select("*, sale_items(variant_id, quantity)")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (!currentSale) return { error: "Venda não encontrada." };
+
+  const locationId = (currentSale as unknown as { location_id: string }).location_id;
+  const currentItems = currentSale.sale_items as { variant_id: string; quantity: number }[];
+
+  // Reverte estoque dos itens antigos
+  for (const item of currentItems ?? []) {
+    const { data: inv } = await supabaseAdmin
+      .from("inventory")
+      .select("id, quantity")
+      .eq("variant_id", item.variant_id)
+      .eq("location_id", locationId)
+      .maybeSingle();
+
+    if (inv) {
+      await supabaseAdmin
+        .from("inventory")
+        .update({ quantity: Number(inv.quantity) + Number(item.quantity) })
+        .eq("id", inv.id);
+    } else {
+      await supabaseAdmin.from("inventory").insert({
+        tenant_id: tenantId,
+        variant_id: item.variant_id,
+        location_id: locationId,
+        quantity: Number(item.quantity),
+      });
+    }
+  }
+
+  // Valida estoque para os novos itens
+  for (const item of parsed.data.items) {
+    const { data: inv } = await supabaseAdmin
+      .from("inventory")
+      .select("quantity")
+      .eq("variant_id", item.variantId)
+      .eq("location_id", locationId)
+      .maybeSingle();
+
+    if (!inv || inv.quantity < item.quantity) {
+      // Reverte o que já foi revertido se falhar
+      return { error: "Estoque insuficiente para um dos itens." };
+    }
+  }
+
+  // Resolve parcelamento
+  const rawInstallments = parseInt(formData.get("installments") as string, 10);
+  const installments = parsed.data.paymentMethod === "credit" && rawInstallments > 1 ? rawInstallments : 1;
+  const hasInterest = formData.get("hasInterest") === "true";
+  const actualPaymentMethod = parsed.data.paymentMethod === "credit" && installments > 1
+    ? "installment" as const
+    : parsed.data.paymentMethod;
+  const installmentNote = installments > 1
+    ? `${installments}x ${hasInterest ? "com juros" : "sem juros"}`
+    : null;
+
+  // Resolve cliente
+  const customerId = (formData.get("customerId") as string) || null;
+  const customerName = ((formData.get("customerName") as string) || "").trim();
+  const rawCpf = ((formData.get("customerCpf") as string) || "").replace(/\D/g, "");
+  const rawPhone = ((formData.get("customerPhone") as string) || "").replace(/\D/g, "");
+  const customerCpf = rawCpf.length === 11 ? rawCpf : null;
+  const customerPhone = rawPhone.length >= 10 ? rawPhone : null;
+  const customerEmail = ((formData.get("customerEmail") as string) || "").trim().toLowerCase() || null;
+  const customerBirthdate = ((formData.get("customerBirthdate") as string) || "").trim() || null;
+  const customerAddress = ((formData.get("customerAddress") as string) || "").trim() || null;
+
+  let resolvedCustomerId: string | null = customerId;
+  if (!resolvedCustomerId && customerName) {
+    const { data: newCustomer } = await supabaseAdmin
+      .from("customers")
+      .insert({
+        tenant_id: tenantId,
+        name: customerName,
+        cpf: customerCpf,
+        phone: customerPhone,
+        email: customerEmail,
+        birthdate: customerBirthdate,
+        address: customerAddress,
+      })
+      .select("id")
+      .single();
+    if (newCustomer) resolvedCustomerId = newCustomer.id;
+  }
+
+  // Calcula totais
+  const totalValue = parsed.data.items.reduce(
+    (s, i) => s + i.quantity * (i.salePrice - i.discount),
+    0
+  );
+  const discountValue = parsed.data.items.reduce(
+    (s, i) => s + i.quantity * i.discount,
+    0
+  );
+
+  // Atualiza a venda
+  await supabaseAdmin
+    .from("sales")
+    .update({
+      customer_id: resolvedCustomerId,
+      payment_method: actualPaymentMethod,
+      total_value: totalValue.toFixed(2),
+      discount_value: discountValue.toFixed(2),
+      notes: [installmentNote, parsed.data.notes || null].filter(Boolean).join(" | ") || null,
+    })
+    .eq("id", id)
+    .eq("tenant_id", tenantId);
+
+  // Remove itens e movimentos antigos
+  await supabaseAdmin.from("inventory_movements").delete().eq("reference_id", id);
+  await supabaseAdmin.from("sale_items").delete().eq("sale_id", id);
+
+  // Insere novos itens
+  const newItems = parsed.data.items.map((item) => ({
+    sale_id: id,
+    variant_id: item.variantId,
+    quantity: item.quantity,
+    unit_cost: "0",
+    sale_price: item.salePrice.toFixed(2),
+    discount: item.discount.toFixed(2),
+  }));
+  await supabaseAdmin.from("sale_items").insert(newItems);
+
+  // Baixa estoque dos novos itens
+  for (const item of parsed.data.items) {
+    const { data: inv } = await supabaseAdmin
+      .from("inventory")
+      .select("id, quantity")
+      .eq("variant_id", item.variantId)
+      .eq("location_id", locationId)
+      .maybeSingle();
+
+    if (inv) {
+      await supabaseAdmin
+        .from("inventory")
+        .update({ quantity: Number(inv.quantity) - item.quantity })
+        .eq("id", inv.id);
+    }
+
+    await supabaseAdmin.from("inventory_movements").insert({
+      tenant_id: tenantId,
+      variant_id: item.variantId,
+      location_id: locationId,
+      quantity_delta: -item.quantity,
+      movement_type: "sale",
+      reference_id: id,
+      note: `Venda ${id.slice(0, 8)} (editada)`,
+    });
+  }
+
+  await writeAuditLog({
+    tenantId,
+    action: "sale.updated",
+    tableName: "sales",
+    recordId: id,
+    newData: { payment_method: actualPaymentMethod, total_value: totalValue } as Record<string, unknown>,
+  });
+
+  revalidatePath("/vendas");
+  revalidatePath("/estoque");
+  redirect("/vendas");
+}
+
 export type DuplicateConflict = { field: "cpf" | "phone" | "email"; customerName: string };
 
 export async function checkCustomerDuplicateAction(fields: {
@@ -310,20 +503,30 @@ export async function cancelSaleAction(id: string): Promise<{ error?: string }> 
 
   const items = sale.sale_items as { variant_id: string; quantity: number; sale_price: string; discount: string }[];
 
+  const locationId = (sale as unknown as { location_id: string }).location_id;
+
   // Reverte estoque de cada item
   for (const item of items ?? []) {
     const { data: inv } = await supabaseAdmin
       .from("inventory")
       .select("id, quantity")
       .eq("variant_id", item.variant_id)
-      .eq("location_id", (sale as unknown as { location_id: string }).location_id)
-      .single();
+      .eq("location_id", locationId)
+      .maybeSingle();
 
     if (inv) {
       await supabaseAdmin
         .from("inventory")
-        .update({ quantity: inv.quantity + item.quantity })
+        .update({ quantity: Number(inv.quantity) + Number(item.quantity) })
         .eq("id", inv.id);
+    } else {
+      // Registro não existe — recria com a quantidade devolvida
+      await supabaseAdmin.from("inventory").insert({
+        tenant_id: tenantId,
+        variant_id: item.variant_id,
+        location_id: locationId,
+        quantity: Number(item.quantity),
+      });
     }
   }
 
@@ -336,7 +539,10 @@ export async function cancelSaleAction(id: string): Promise<{ error?: string }> 
     oldData: sale as unknown as Record<string, unknown>,
   });
 
-  // Hard delete — remove itens, movimentos e a venda
+  // Hard delete — remove dívidas, itens, movimentos e a venda
+  await supabaseAdmin.from("debt_payments").delete()
+    .in("debt_id", (await supabaseAdmin.from("debts").select("id").eq("sale_id", id).eq("tenant_id", tenantId)).data?.map(d => d.id) ?? []);
+  await supabaseAdmin.from("debts").delete().eq("sale_id", id).eq("tenant_id", tenantId);
   await supabaseAdmin.from("inventory_movements").delete().eq("reference_id", id);
   await supabaseAdmin.from("sale_items").delete().eq("sale_id", id);
   await supabaseAdmin.from("sales").delete().eq("id", id).eq("tenant_id", tenantId);

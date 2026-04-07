@@ -2,11 +2,13 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { adjustInventoryAction } from "./actions";
 
 type Variant = {
   id: string;
+  variantId: string;
   color: string;
   size: string;
   sku: string;
@@ -36,11 +38,15 @@ export function AdjustModal({
   variant: Variant;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [state, formAction] = useFormState(adjustInventoryAction, {});
 
   useEffect(() => {
-    if (state.success) onClose();
-  }, [state.success]);
+    if (state.success) {
+      router.refresh();
+      onClose();
+    }
+  }, [state.success]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -60,7 +66,7 @@ export function AdjustModal({
         </div>
 
         <form action={formAction} className="space-y-4">
-          <input type="hidden" name="variantId" value={variant.id} />
+          <input type="hidden" name="variantId" value={variant.variantId} />
           <input type="hidden" name="locationId" value={variant.locationId} />
 
           <div>

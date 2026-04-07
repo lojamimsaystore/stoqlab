@@ -44,15 +44,30 @@ async function uploadPhoto(
     const path = `${tenantId}/${productId}/cover.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
+    // Remove arquivos antigos de capa antes de fazer o novo upload
+    const { data: existing } = await supabaseAdmin.storage
+      .from("products")
+      .list(`${tenantId}/${productId}`, { search: "cover" });
+
+    if (existing && existing.length > 0) {
+      await supabaseAdmin.storage
+        .from("products")
+        .remove(existing.map((f) => `${tenantId}/${productId}/${f.name}`));
+    }
+
     const { error } = await supabaseAdmin.storage
       .from("products")
-      .upload(path, buffer, { contentType: file.type, upsert: true });
+      .upload(path, buffer, { contentType: file.type });
 
-    if (error) return null;
+    if (error) {
+      console.error("[uploadPhoto] Supabase storage error:", error);
+      return null;
+    }
 
     const { data } = supabaseAdmin.storage.from("products").getPublicUrl(path);
     return `${data.publicUrl}?t=${Date.now()}`;
-  } catch {
+  } catch (err) {
+    console.error("[uploadPhoto] Unexpected error:", err);
     return null;
   }
 }

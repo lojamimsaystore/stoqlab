@@ -114,6 +114,7 @@ export async function createProductAction(
     return { error: parsed.error.errors[0]?.message ?? "Dados inválidos" };
 
   const { name, categoryId, description, color, size, quantity, salePrice, purchaseDate } = parsed.data;
+  const colorHex = (formData.get("colorHex") as string | null) || null;
 
   // 1. Criar produto
   const { data: product, error: productError } = await supabaseAdmin
@@ -150,6 +151,7 @@ export async function createProductAction(
       tenant_id: tenantId,
       product_id: product.id,
       color,
+      color_hex: colorHex,
       size,
       sku,
       sale_price: salePrice ?? null,
@@ -366,6 +368,7 @@ export async function createVariantAction(
 
   const raw = {
     color: formData.get("color"),
+    colorHex: formData.get("colorHex") || undefined,
     size: formData.get("size"),
     sku: formData.get("sku") || generateSku(productName, formData.get("color") as string, formData.get("size") as string),
     barcode: formData.get("barcode") || undefined,
@@ -384,6 +387,7 @@ export async function createVariantAction(
       tenant_id: tenantId,
       product_id: productId,
       color: parsed.data.color,
+      color_hex: parsed.data.colorHex ?? null,
       size: parsed.data.size,
       sku: parsed.data.sku,
       barcode: parsed.data.barcode,

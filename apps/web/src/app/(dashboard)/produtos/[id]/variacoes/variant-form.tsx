@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
+import { useState } from "react";
 import { createVariantAction } from "../../actions";
 
 const SIZES = ["PP", "P", "M", "G", "GG", "GGG", "Único", "34", "36", "38", "40", "42", "44", "46", "48", "50"];
@@ -27,6 +28,7 @@ export function VariantForm({
 }) {
   const action = createVariantAction.bind(null, productId, productName);
   const [formState, boundAction] = useFormState(action, {});
+  const [colorHex, setColorHex] = useState("#000000");
 
   return (
     <form action={boundAction} className="space-y-4">
@@ -53,13 +55,19 @@ export function VariantForm({
             <input
               name="colorHex"
               type="color"
-              defaultValue="#000000"
+              value={colorHex}
+              onChange={(e) => setColorHex(e.target.value)}
               className="h-[38px] w-12 rounded border border-slate-300 cursor-pointer p-0.5"
             />
             <input
               type="text"
-              readOnly
-              className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 text-slate-500"
+              value={colorHex}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setColorHex(v);
+              }}
+              maxLength={7}
+              className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="#000000"
             />
           </div>

@@ -4,6 +4,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { ImagePlus, X } from "lucide-react";
+
 import { SIZES } from "@stoqlab/validators";
 
 type Category = { id: string; name: string };
@@ -32,6 +33,7 @@ export function NewProductForm({
   const [state, formAction] = useFormState(action, {});
   const [preview, setPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [colorHex, setColorHex] = useState("#000000");
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -132,12 +134,32 @@ export function NewProductForm({
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Cor <span className="text-red-500">*</span>
             </label>
-            <input
-              name="color"
-              required
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Ex: Preto, Azul marinho..."
-            />
+            <div className="flex gap-2">
+              <input
+                type="color"
+                value={colorHex}
+                onChange={(e) => setColorHex(e.target.value)}
+                className="h-[38px] w-12 rounded border border-slate-300 cursor-pointer p-0.5 shrink-0"
+              />
+              <input
+                name="colorHex"
+                type="text"
+                value={colorHex}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setColorHex(v);
+                }}
+                maxLength={7}
+                className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="#000000"
+              />
+              <input
+                name="color"
+                required
+                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ex: Preto, Azul marinho..."
+              />
+            </div>
           </div>
 
           <div>

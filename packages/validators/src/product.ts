@@ -58,6 +58,7 @@ export const createProductFullSchema = z.object({
 
 export const variantSchema = z.object({
   color: z.string().min(1).max(60),
+  colorHex: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   size: z.string().min(1).max(20),
   sku: z.string().min(1).max(80),
   barcode: z.string().max(80).optional(),

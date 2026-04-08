@@ -32,36 +32,60 @@ export default async function ComprasPage({
   if (dateTo) query = query.lte("purchased_at", dateTo);
 
   if (q) {
-    // Busca por nome de produto: produto → variação → item de compra
+    const matchingIds = new Set<string>();
+
+    // 1. Por número de NF
+    const { data: invoiceMatches } = await supabaseAdmin
+      .from("purchases")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .ilike("invoice_number", `%${q}%`);
+    for (const m of invoiceMatches ?? []) matchingIds.add(m.id);
+
+    // 2. Por nome de fornecedor
+    const { data: supplierMatches } = await supabaseAdmin
+      .from("suppliers")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .ilike("name", `%${q}%`);
+    if (supplierMatches?.length) {
+      const { data: supplierPurchases } = await supabaseAdmin
+        .from("purchases")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .is("deleted_at", null)
+        .in("supplier_id", supplierMatches.map((s) => s.id));
+      for (const m of supplierPurchases ?? []) matchingIds.add(m.id);
+    }
+
+    // 3. Por nome de produto (produto → variação → item de compra)
     const { data: productMatches } = await supabaseAdmin
       .from("products")
       .select("id")
       .eq("tenant_id", tenantId)
       .is("deleted_at", null)
       .ilike("name", `%${q}%`);
-
-    let productPurchaseIds: string[] = [];
-    if (productMatches && productMatches.length > 0) {
+    if (productMatches?.length) {
       const { data: variantRows } = await supabaseAdmin
         .from("product_variants")
         .select("id")
         .eq("tenant_id", tenantId)
-        .in("product_id", productMatches.map((p) => p.id))
-        .is("deleted_at", null);
-
-      if (variantRows && variantRows.length > 0) {
+        .in("product_id", productMatches.map((p) => p.id));
+      if (variantRows?.length) {
         const { data: itemRows } = await supabaseAdmin
           .from("purchase_items")
           .select("purchase_id")
           .in("variant_id", variantRows.map((v) => v.id));
-        productPurchaseIds = [...new Set((itemRows ?? []).map((i) => i.purchase_id as string))];
+        for (const m of itemRows ?? []) matchingIds.add(m.purchase_id as string);
       }
     }
 
-    if (productPurchaseIds.length > 0) {
-      query = query.or(`invoice_number.ilike.%${q}%,id.in.(${productPurchaseIds.join(",")})`);
+    // Filtra pelo conjunto de IDs encontrados (ou força resultado vazio se nada bateu)
+    if (matchingIds.size > 0) {
+      query = query.in("id", [...matchingIds]);
     } else {
-      query = query.ilike("invoice_number", `%${q}%`);
+      query = query.eq("id", "00000000-0000-0000-0000-000000000000");
     }
   }
 
@@ -89,7 +113,7 @@ export default async function ComprasPage({
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-2">
         <Suspense fallback={null}>
-          <SearchInput placeholder="Buscar por NF ou nome do produto…" className="flex-1" />
+          <SearchInput placeholder="Buscar por NF, fornecedor ou produto…" className="flex-1" />
         </Suspense>
         <Suspense fallback={null}>
           <DateFilter />

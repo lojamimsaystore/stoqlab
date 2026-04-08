@@ -43,7 +43,7 @@ type Product = {
   brand: string | null;
   status: string;
   cover_image_url: string | null;
-  categories: { name: string }[] | null;
+  categories: { name: string } | null;
   product_variants: { id: string; color: string; color_hex: string | null }[];
 };
 
@@ -171,7 +171,7 @@ export function ProductsGrid({ products }: { products: Product[] }) {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7 gap-3">
         {products.map((p) => {
           const variants = p.product_variants ?? [];
-          const category = (p.categories as unknown as Array<{ name: string }> | null)?.[0]?.name;
+          const category = (p.categories as { name: string } | null)?.name;
           const uniqueColors = variants.filter(
             (v, i, arr) => arr.findIndex((x) => x.color === v.color) === i
           );

@@ -175,16 +175,19 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
   for (const pv of pendingVariants) {
     const productId = productIdMap[pv.productTempId] ?? pv.productTempId;
     const productName = pendingProducts.find(p => p.tempId === pv.productTempId)?.name ?? "";
-    const sku = generateSku(productName || pv.productTempId, pv.color, pv.size);
 
-    // Check if variant with this SKU already exists (avoids unique constraint failure on retry)
+    // Lookup by (product_id, color, size) — unique identity, avoids matching wrong product's variant by SKU
     const { data: existingVariant } = await supabaseAdmin
       .from("product_variants")
       .select("id")
       .eq("tenant_id", tenantId)
-      .eq("sku", sku)
+      .eq("product_id", productId)
+      .ilike("color", pv.color.trim())
+      .eq("size", pv.size)
       .is("deleted_at", null)
       .maybeSingle();
+
+    const sku = generateSku(productName || pv.productTempId, pv.color, pv.size);
 
     if (existingVariant) {
       variantIdMap[pv.tempId] = existingVariant.id;
@@ -296,17 +299,23 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
       .maybeSingle();
 
     if (inv) {
-      await supabaseAdmin
+      const { error: invUpdateError } = await supabaseAdmin
         .from("inventory")
-        .update({ quantity: inv.quantity + item.quantity })
+        .update({ quantity: Number(inv.quantity) + item.quantity })
         .eq("id", inv.id);
+      if (invUpdateError) {
+        console.error("[createPurchase] inventory update error:", invUpdateError);
+      }
     } else {
-      await supabaseAdmin.from("inventory").insert({
+      const { error: invInsertError } = await supabaseAdmin.from("inventory").insert({
         tenant_id: tenantId,
         variant_id: item.variantId,
         location_id: locationId,
         quantity: item.quantity,
       });
+      if (invInsertError) {
+        console.error("[createPurchase] inventory insert error:", invInsertError);
+      }
     }
 
     // Movimento

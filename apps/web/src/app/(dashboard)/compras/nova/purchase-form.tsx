@@ -305,7 +305,7 @@ export function PurchaseForm({
             prod.id === p.tempId ? { ...prod, name: p.name } : prod
           ));
           setPendingProducts((prev) => prev.map((pp) =>
-            pp.tempId === p.tempId ? { ...pp, name: p.name } : pp
+            pp.tempId === p.tempId ? { ...pp, name: p.name, categoryId: p.categoryId } : pp
           ));
           setItems((prev) => prev.map((item) =>
             item.productId === p.tempId ? { ...item, productName: p.name } : item

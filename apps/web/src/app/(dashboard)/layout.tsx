@@ -47,16 +47,12 @@ export default async function DashboardLayout({
   let sidebarFontColor: string | undefined;
 
   if (profile?.tenant_id) {
-    const [{ data: tenantData }, { data: invData }] = await Promise.all([
-      supabaseAdmin.from("tenants").select("settings").eq("id", profile.tenant_id).single(),
-      supabaseAdmin
-        .from("inventory")
-        .select("id, quantity, product_variants(color, size, products(name)), locations(name)")
-        .eq("tenant_id", profile.tenant_id)
-        .gte("quantity", 1)
-        .order("quantity", { ascending: true })
-        .limit(100),
-    ]);
+    // Busca configurações primeiro para usar o threshold real na query de estoque
+    const { data: tenantData } = await supabaseAdmin
+      .from("tenants")
+      .select("settings")
+      .eq("id", profile.tenant_id)
+      .single();
 
     const settings = (tenantData?.settings as Record<string, unknown>) ?? {};
     lowStockThreshold = typeof settings.low_stock_threshold === "number"
@@ -68,9 +64,17 @@ export default async function DashboardLayout({
     sidebarColor = typeof settings.sidebar_color === "string" ? settings.sidebar_color : undefined;
     sidebarFontColor = typeof settings.sidebar_font_color === "string" ? settings.sidebar_font_color : undefined;
 
+    // Filtra estoque baixo direto no banco (evita buscar centenas de linhas desnecessárias)
+    const { data: invData } = await supabaseAdmin
+      .from("inventory")
+      .select("id, quantity, product_variants(color, size, products(name)), locations(name)")
+      .eq("tenant_id", profile.tenant_id)
+      .gte("quantity", 1)
+      .lte("quantity", lowStockThreshold)
+      .order("quantity", { ascending: true })
+      .limit(15);
+
     lowStockItems = (invData ?? [])
-      .filter((row) => row.quantity <= lowStockThreshold)
-      .slice(0, 15)
       .map((row) => {
         const variant = row.product_variants as unknown as { color: string; size: string; products: { name: string } | null } | null;
         const location = row.locations as unknown as { name: string } | null;

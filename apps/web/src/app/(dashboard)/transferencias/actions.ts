@@ -219,7 +219,7 @@ export async function deleteTransferAction(
 
   await supabaseAdmin.from("inventory_movements").delete().eq("reference_id", transferId);
   await supabaseAdmin.from("transfer_items").delete().eq("transfer_id", transferId);
-  await supabaseAdmin.from("stock_transfers").delete().eq("id", transferId);
+  await supabaseAdmin.from("stock_transfers").delete().eq("id", transferId).eq("tenant_id", tenantId);
 
   revalidatePath("/transferencias");
   revalidatePath("/estoque");

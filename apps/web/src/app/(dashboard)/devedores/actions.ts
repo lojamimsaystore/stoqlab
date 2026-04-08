@@ -228,7 +228,8 @@ export async function addPaymentAction(
   const { data: payments } = await supabaseAdmin
     .from("debt_payments")
     .select("amount")
-    .eq("debt_id", debtId);
+    .eq("debt_id", debtId)
+    .eq("tenant_id", tenantId);
 
   const totalPaid = (payments ?? []).reduce((s, p) => s + Number(p.amount), 0);
   const totalAmount = Number(debt.total_amount);
@@ -237,7 +238,8 @@ export async function addPaymentAction(
   await supabaseAdmin
     .from("debts")
     .update({ status })
-    .eq("id", debtId);
+    .eq("id", debtId)
+    .eq("tenant_id", tenantId);
 
   revalidatePath(`/devedores/${debtId}`);
   revalidatePath("/devedores");
@@ -302,18 +304,20 @@ export async function deletePaymentAction(
     .from("debts")
     .select("total_amount")
     .eq("id", debtId)
+    .eq("tenant_id", tenantId)
     .single();
 
   const { data: payments } = await supabaseAdmin
     .from("debt_payments")
     .select("amount")
-    .eq("debt_id", debtId);
+    .eq("debt_id", debtId)
+    .eq("tenant_id", tenantId);
 
   const totalPaid = (payments ?? []).reduce((s, p) => s + Number(p.amount), 0);
   const totalAmount = Number(debt?.total_amount ?? 0);
   const status = totalPaid >= totalAmount ? "paid" : totalPaid > 0 ? "partial" : "open";
 
-  await supabaseAdmin.from("debts").update({ status }).eq("id", debtId);
+  await supabaseAdmin.from("debts").update({ status }).eq("id", debtId).eq("tenant_id", tenantId);
 
   revalidatePath(`/devedores/${debtId}`);
   revalidatePath("/devedores");
@@ -324,7 +328,7 @@ export async function deletePaymentAction(
 export async function deleteDebtAction(debtId: string): Promise<void> {
   const tenantId = await getTenantId();
 
-  await supabaseAdmin.from("debt_payments").delete().eq("debt_id", debtId);
+  await supabaseAdmin.from("debt_payments").delete().eq("debt_id", debtId).eq("tenant_id", tenantId);
   await supabaseAdmin
     .from("debts")
     .delete()

@@ -167,7 +167,7 @@ export async function createSaleAction(
     .insert(saleItems);
 
   if (itemsError) {
-    await supabaseAdmin.from("sales").delete().eq("id", sale.id);
+    await supabaseAdmin.from("sales").delete().eq("id", sale.id).eq("tenant_id", tenantId);
     return { error: "Erro ao salvar itens da venda." };
   }
 

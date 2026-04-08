@@ -276,35 +276,64 @@ export async function toggleProductArchiveAction(
 
 export async function bulkDeleteProductsAction(ids: string[]): Promise<{ error?: string; deleted: number }> {
   const tenantId = await getTenantId();
+  if (ids.length === 0) return { deleted: 0 };
+
+  // Busca TODAS as variações de uma vez (1 query em vez de N)
+  const { data: allVariants } = await supabaseAdmin
+    .from("product_variants")
+    .select("id, product_id")
+    .in("product_id", ids)
+    .eq("tenant_id", tenantId);
+
+  // Mapeia product_id → variantIds
+  const variantsByProduct = new Map<string, string[]>();
+  for (const v of allVariants ?? []) {
+    const list = variantsByProduct.get(v.product_id) ?? [];
+    list.push(v.id);
+    variantsByProduct.set(v.product_id, list);
+  }
+
+  const allVariantIds = (allVariants ?? []).map((v) => v.id);
+
+  // Verifica quais variações têm vínculos (1 query por tabela em vez de N)
+  const [{ data: saleItems }, { data: purchaseItems }, { data: transferItems }] = await Promise.all([
+    allVariantIds.length ? supabaseAdmin.from("sale_items").select("variant_id").in("variant_id", allVariantIds) : Promise.resolve({ data: [] }),
+    allVariantIds.length ? supabaseAdmin.from("purchase_items").select("variant_id").in("variant_id", allVariantIds) : Promise.resolve({ data: [] }),
+    allVariantIds.length ? supabaseAdmin.from("transfer_items").select("variant_id").in("variant_id", allVariantIds) : Promise.resolve({ data: [] }),
+  ]);
+
+  const blockedVariantIds = new Set([
+    ...(saleItems ?? []).map((r) => r.variant_id),
+    ...(purchaseItems ?? []).map((r) => r.variant_id),
+    ...(transferItems ?? []).map((r) => r.variant_id),
+  ]);
+
   let deleted = 0;
+  const deletableProductIds: string[] = [];
+  const deletableVariantIds: string[] = [];
 
   for (const id of ids) {
-    const { data: variants } = await supabaseAdmin
-      .from("product_variants")
-      .select("id")
-      .eq("product_id", id)
-      .eq("tenant_id", tenantId);
+    const variantIds = variantsByProduct.get(id) ?? [];
+    const hasBlocked = variantIds.some((vid) => blockedVariantIds.has(vid));
+    if (hasBlocked) continue;
+    deletableProductIds.push(id);
+    deletableVariantIds.push(...variantIds);
+  }
 
-    const variantIds = variants?.map((v) => v.id) ?? [];
+  if (deletableVariantIds.length > 0) {
+    await supabaseAdmin.from("inventory_movements").delete().in("variant_id", deletableVariantIds);
+    await supabaseAdmin.from("inventory").delete().in("variant_id", deletableVariantIds);
+    await supabaseAdmin.from("product_variants").delete().in("id", deletableVariantIds);
+  }
 
-    if (variantIds.length > 0) {
-      const [{ data: saleItems }, { data: purchaseItems }, { data: transferItems }] = await Promise.all([
-        supabaseAdmin.from("sale_items").select("id").in("variant_id", variantIds).limit(1),
-        supabaseAdmin.from("purchase_items").select("id").in("variant_id", variantIds).limit(1),
-        supabaseAdmin.from("transfer_items").select("id").in("variant_id", variantIds).limit(1),
-      ]);
-
-      if (saleItems?.length || purchaseItems?.length || transferItems?.length) {
-        continue; // pula produtos vinculados
-      }
-
-      await supabaseAdmin.from("inventory_movements").delete().in("variant_id", variantIds);
-      await supabaseAdmin.from("inventory").delete().in("variant_id", variantIds);
-      await supabaseAdmin.from("product_variants").delete().in("id", variantIds);
-    }
-
-    const { error } = await supabaseAdmin.from("products").delete().eq("id", id).eq("tenant_id", tenantId);
-    if (!error) deleted++;
+  if (deletableProductIds.length > 0) {
+    const { data: deletedProducts } = await supabaseAdmin
+      .from("products")
+      .delete()
+      .in("id", deletableProductIds)
+      .eq("tenant_id", tenantId)
+      .select("id");
+    deleted = deletedProducts?.length ?? 0;
   }
 
   revalidatePath("/produtos");

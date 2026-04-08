@@ -6,6 +6,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
+import { adjustInventory } from "@/lib/inventory";
 
 export type CustomerResult = {
   id: string;
@@ -171,20 +172,11 @@ export async function createSaleAction(
     return { error: "Erro ao salvar itens da venda." };
   }
 
-  // Baixa estoque
+  // Baixa estoque (atômico via RPC — sem race condition)
   for (const item of parsed.data.items) {
-    const { data: inv } = await supabaseAdmin
-      .from("inventory")
-      .select("id, quantity")
-      .eq("variant_id", item.variantId)
-      .eq("location_id", locationId)
-      .single();
-
-    if (inv) {
-      await supabaseAdmin
-        .from("inventory")
-        .update({ quantity: inv.quantity - item.quantity })
-        .eq("id", inv.id);
+    const invResult = await adjustInventory(tenantId, item.variantId, locationId, -item.quantity);
+    if (!invResult.ok && invResult.reason === "insufficient_stock") {
+      console.error("[createSale] estoque insuficiente para variant:", item.variantId);
     }
 
     await supabaseAdmin.from("inventory_movements").insert({
@@ -275,28 +267,9 @@ export async function updateSaleAction(
   const locationId = (currentSale as unknown as { location_id: string }).location_id;
   const currentItems = currentSale.sale_items as { variant_id: string; quantity: number }[];
 
-  // Reverte estoque dos itens antigos
+  // Reverte estoque dos itens antigos (devolve ao estoque — delta positivo atômico)
   for (const item of currentItems ?? []) {
-    const { data: inv } = await supabaseAdmin
-      .from("inventory")
-      .select("id, quantity")
-      .eq("variant_id", item.variant_id)
-      .eq("location_id", locationId)
-      .maybeSingle();
-
-    if (inv) {
-      await supabaseAdmin
-        .from("inventory")
-        .update({ quantity: Number(inv.quantity) + Number(item.quantity) })
-        .eq("id", inv.id);
-    } else {
-      await supabaseAdmin.from("inventory").insert({
-        tenant_id: tenantId,
-        variant_id: item.variant_id,
-        location_id: locationId,
-        quantity: Number(item.quantity),
-      });
-    }
+    await adjustInventory(tenantId, item.variant_id, locationId, Number(item.quantity));
   }
 
   // Valida estoque para os novos itens
@@ -392,21 +365,9 @@ export async function updateSaleAction(
   }));
   await supabaseAdmin.from("sale_items").insert(newItems);
 
-  // Baixa estoque dos novos itens
+  // Baixa estoque dos novos itens (atômico via RPC)
   for (const item of parsed.data.items) {
-    const { data: inv } = await supabaseAdmin
-      .from("inventory")
-      .select("id, quantity")
-      .eq("variant_id", item.variantId)
-      .eq("location_id", locationId)
-      .maybeSingle();
-
-    if (inv) {
-      await supabaseAdmin
-        .from("inventory")
-        .update({ quantity: Number(inv.quantity) - item.quantity })
-        .eq("id", inv.id);
-    }
+    await adjustInventory(tenantId, item.variantId, locationId, -item.quantity);
 
     await supabaseAdmin.from("inventory_movements").insert({
       tenant_id: tenantId,
@@ -505,29 +466,9 @@ export async function cancelSaleAction(id: string): Promise<{ error?: string }> 
 
   const locationId = (sale as unknown as { location_id: string }).location_id;
 
-  // Reverte estoque de cada item
+  // Reverte estoque de cada item (atômico via RPC)
   for (const item of items ?? []) {
-    const { data: inv } = await supabaseAdmin
-      .from("inventory")
-      .select("id, quantity")
-      .eq("variant_id", item.variant_id)
-      .eq("location_id", locationId)
-      .maybeSingle();
-
-    if (inv) {
-      await supabaseAdmin
-        .from("inventory")
-        .update({ quantity: Number(inv.quantity) + Number(item.quantity) })
-        .eq("id", inv.id);
-    } else {
-      // Registro não existe — recria com a quantidade devolvida
-      await supabaseAdmin.from("inventory").insert({
-        tenant_id: tenantId,
-        variant_id: item.variant_id,
-        location_id: locationId,
-        quantity: Number(item.quantity),
-      });
-    }
+    await adjustInventory(tenantId, item.variant_id, locationId, Number(item.quantity));
   }
 
   // Registra no audit_log antes de deletar

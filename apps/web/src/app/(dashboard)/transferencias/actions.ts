@@ -6,6 +6,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
+import { adjustInventory } from "@/lib/inventory";
 
 const itemSchema = z.object({
   variantId: z.string().uuid(),
@@ -86,44 +87,10 @@ export async function createTransferAction(
     }))
   );
 
-  // Movimenta estoque
+  // Movimenta estoque (atômico via RPC)
   for (const item of parsed.data.items) {
-    // Subtrai da origem
-    const { data: fromInv } = await supabaseAdmin
-      .from("inventory")
-      .select("id, quantity")
-      .eq("variant_id", item.variantId)
-      .eq("location_id", fromLocationId)
-      .single();
-
-    if (fromInv) {
-      await supabaseAdmin
-        .from("inventory")
-        .update({ quantity: fromInv.quantity - item.quantity })
-        .eq("id", fromInv.id);
-    }
-
-    // Adiciona no destino (upsert)
-    const { data: toInv } = await supabaseAdmin
-      .from("inventory")
-      .select("id, quantity")
-      .eq("variant_id", item.variantId)
-      .eq("location_id", toLocationId)
-      .single();
-
-    if (toInv) {
-      await supabaseAdmin
-        .from("inventory")
-        .update({ quantity: toInv.quantity + item.quantity })
-        .eq("id", toInv.id);
-    } else {
-      await supabaseAdmin.from("inventory").insert({
-        tenant_id: tenantId,
-        variant_id: item.variantId,
-        location_id: toLocationId,
-        quantity: item.quantity,
-      });
-    }
+    await adjustInventory(tenantId, item.variantId, fromLocationId, -item.quantity);
+    await adjustInventory(tenantId, item.variantId, toLocationId, item.quantity);
 
     // Movimentos
     await supabaseAdmin.from("inventory_movements").insert([

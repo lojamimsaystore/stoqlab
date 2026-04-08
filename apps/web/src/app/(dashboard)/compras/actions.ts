@@ -6,6 +6,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
+import { adjustInventory } from "@/lib/inventory";
 
 const itemSchema = z.object({
   variantId: z.string().uuid(),
@@ -287,35 +288,11 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
     return { error: "Erro ao salvar itens da compra." };
   }
 
-  // 3. Atualizar estoque e registrar movimentações
+  // 3. Atualizar estoque (atômico via RPC — sem race condition) e registrar movimentações
   for (const item of resolvedItems) {
-    // Upsert inventory
-    const { data: inv } = await supabaseAdmin
-      .from("inventory")
-      .select("id, quantity")
-      .eq("tenant_id", tenantId)
-      .eq("variant_id", item.variantId)
-      .eq("location_id", locationId)
-      .maybeSingle();
-
-    if (inv) {
-      const { error: invUpdateError } = await supabaseAdmin
-        .from("inventory")
-        .update({ quantity: Number(inv.quantity) + item.quantity })
-        .eq("id", inv.id);
-      if (invUpdateError) {
-        console.error("[createPurchase] inventory update error:", invUpdateError);
-      }
-    } else {
-      const { error: invInsertError } = await supabaseAdmin.from("inventory").insert({
-        tenant_id: tenantId,
-        variant_id: item.variantId,
-        location_id: locationId,
-        quantity: item.quantity,
-      });
-      if (invInsertError) {
-        console.error("[createPurchase] inventory insert error:", invInsertError);
-      }
+    const invResult = await adjustInventory(tenantId, item.variantId, locationId, item.quantity);
+    if (!invResult.ok) {
+      console.error("[createPurchase] inventory adjust error:", invResult.message);
     }
 
     // Movimento
@@ -395,22 +372,9 @@ export async function updatePurchaseAction(
   const locationId = (currentPurchase as unknown as { location_id: string }).location_id;
   const currentItems = currentPurchase.purchase_items as { variant_id: string; quantity: number; unit_cost: string }[];
 
-  // Reverte estoque dos itens antigos (desfaz a entrada)
+  // Reverte estoque dos itens antigos (desfaz a entrada — delta negativo atômico)
   for (const item of currentItems ?? []) {
-    const { data: inv } = await supabaseAdmin
-      .from("inventory")
-      .select("id, quantity")
-      .eq("variant_id", item.variant_id)
-      .eq("location_id", locationId)
-      .maybeSingle();
-
-    if (inv) {
-      const newQty = Math.max(0, Number(inv.quantity) - Number(item.quantity));
-      await supabaseAdmin
-        .from("inventory")
-        .update({ quantity: newQty })
-        .eq("id", inv.id);
-    }
+    await adjustInventory(tenantId, item.variant_id, locationId, -Number(item.quantity));
   }
 
   const { supplierId, invoiceNumber, purchasedAt, paymentMethod, freightCost, otherCosts, notes } = parsed.data;
@@ -450,28 +414,9 @@ export async function updatePurchaseAction(
   }));
   await supabaseAdmin.from("purchase_items").insert(purchaseItems);
 
-  // Atualiza estoque com novos itens
+  // Atualiza estoque com novos itens (atômico via RPC)
   for (const item of parsed.data.items) {
-    const { data: inv } = await supabaseAdmin
-      .from("inventory")
-      .select("id, quantity")
-      .eq("variant_id", item.variantId)
-      .eq("location_id", locationId)
-      .maybeSingle();
-
-    if (inv) {
-      await supabaseAdmin
-        .from("inventory")
-        .update({ quantity: Number(inv.quantity) + item.quantity })
-        .eq("id", inv.id);
-    } else {
-      await supabaseAdmin.from("inventory").insert({
-        tenant_id: tenantId,
-        variant_id: item.variantId,
-        location_id: locationId,
-        quantity: item.quantity,
-      });
-    }
+    await adjustInventory(tenantId, item.variantId, locationId, item.quantity);
 
     await supabaseAdmin.from("inventory_movements").insert({
       tenant_id: tenantId,

@@ -18,7 +18,7 @@ const PAYMENT_METHODS = ["cash", "pix", "debit", "credit"] as const;
 const PURCHASE_STATUSES = ["received", "cancelled", "confirmed"] as const;
 
 const purchaseSchema = z.object({
-  supplierId: z.string().uuid().optional(),
+  supplierId: z.string().uuid({ message: "Selecione um fornecedor." }),
   invoiceNumber: z.string().min(1, "Nº nota fiscal obrigatório").max(60),
   purchasedAt: z.string().min(1, "Data obrigatória"),
   paymentMethod: z.enum(PAYMENT_METHODS, { errorMap: () => ({ message: "Forma de pagamento obrigatória" }) }),

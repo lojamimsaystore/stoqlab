@@ -442,15 +442,17 @@ export function PurchaseForm({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               {/* Fornecedor */}
               <div className="sm:col-span-2 lg:col-span-1">
-                <label className="block text-xs font-medium text-slate-700 mb-1">Fornecedor</label>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Fornecedor <span className="text-red-500">*</span>
+                </label>
                 <div className="flex gap-1.5">
                   <select
                     name="supplierId"
                     value={selectedSupplierId}
                     onChange={(e) => setSelectedSupplierId(e.target.value)}
-                    className="flex-1 min-w-0 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+                    className={`flex-1 min-w-0 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800 ${!selectedSupplierId ? "border-slate-300 text-slate-400" : "border-slate-200"}`}
                   >
-                    <option value="">Sem fornecedor</option>
+                    <option value="">Selecione o fornecedor…</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}

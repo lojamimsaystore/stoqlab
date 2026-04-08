@@ -57,7 +57,8 @@ function ColorGroupRows({
   const [isPending, startTransition] = useTransition();
 
   const salePriceNum = parseFloat(salePrice.replace(",", ".")) || 0;
-  const margin = avgCost && salePriceNum > 0 ? ((salePriceNum - avgCost) / salePriceNum) * 100 : null;
+  // Markup = (preço - custo) / custo × 100 — pode ultrapassar 100%
+  const margin = avgCost && avgCost > 0 && salePriceNum > 0 ? ((salePriceNum - avgCost) / avgCost) * 100 : null;
   const profit = avgCost !== null && salePriceNum > 0 ? salePriceNum - avgCost : null;
 
   function handlePriceChange(value: string) {
@@ -294,7 +295,7 @@ export function VariantColorGroups({
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[14%]">SKU</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[11%]">Custo unit.</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[13%]">Valor de venda</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[11%]">Margem</th>
+                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[11%]">Markup</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Lucro</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Lucro total</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[8%]">Ações</th>

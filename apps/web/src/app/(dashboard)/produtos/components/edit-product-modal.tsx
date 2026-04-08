@@ -31,17 +31,20 @@ type ColorEdit = {
   hex: string;
 };
 
-type Props = {
-  product: {
-    id: string;
-    name: string;
-    cover_image_url: string | null;
-    product_variants: Variant[];
-  };
-  onClose: () => void;
+type UpdatedProduct = {
+  id: string;
+  name: string;
+  cover_image_url: string | null;
+  product_variants: Variant[];
 };
 
-export function EditProductModal({ product, onClose }: Props) {
+type Props = {
+  product: UpdatedProduct;
+  onClose: () => void;
+  onSaved?: (updated: UpdatedProduct) => void;
+};
+
+export function EditProductModal({ product, onClose, onSaved }: Props) {
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
   const [name, setName] = useState(product.name);
@@ -87,8 +90,24 @@ export function EditProductModal({ product, onClose }: Props) {
       if (colorResult.error) { toast.error(colorResult.error); return; }
 
       toast.success("Produto atualizado.");
-      router.refresh();
-      onClose();
+
+      // Atualiza o grid imediatamente com os novos dados (sem esperar router.refresh)
+      const updatedVariants: Variant[] = product.product_variants.map((v) => {
+        const edit = colors.find((c) => c.original.toUpperCase() === v.color.toUpperCase());
+        return edit
+          ? { ...v, color: edit.name.trim().toUpperCase(), color_hex: edit.hex }
+          : v;
+      });
+      onSaved?.({
+        id: product.id,
+        name: name.trim().toUpperCase(),
+        cover_image_url: previewUrl,
+        product_variants: updatedVariants,
+      });
+
+      router.refresh(); // sincroniza dados do servidor em segundo plano
+      // onSaved já fecha o modal via setEditingProduct(null) no grid; se não tiver onSaved, fecha direto
+      if (!onSaved) onClose();
     } catch {
       toast.error("Erro ao salvar. Tente novamente.");
     } finally {

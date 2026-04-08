@@ -665,13 +665,13 @@ export async function updateProductVariantColorsAction(
     const newColor = u.newColor.trim().toUpperCase();
     if (!newColor) return { error: "Nome de cor não pode ser vazio." };
 
-    // Atualiza em TODOS os produtos do tenant com esse nome de cor,
+    // Atualiza em TODOS os produtos do tenant com esse nome de cor (case-insensitive),
     // garantindo consistência da paleta e persistência para produtos futuros.
     const { error } = await supabaseAdmin
       .from("product_variants")
       .update({ color: newColor, color_hex: u.newHex || null })
       .eq("tenant_id", tenantId)
-      .eq("color", u.oldColor);
+      .ilike("color", u.oldColor);  // ilike = case-insensitive: "jeans" == "JEANS" == "Jeans"
 
     if (error) return { error: `Erro ao atualizar cor "${u.oldColor}".` };
   }

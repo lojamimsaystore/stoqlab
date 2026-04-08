@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Package, Trash2, X, Check, Pencil } from "lucide-react";
@@ -47,12 +47,17 @@ type Product = {
   product_variants: { id: string; color: string; color_hex: string | null; inventory: { quantity: number }[] }[];
 };
 
-export function ProductsGrid({ products }: { products: Product[] }) {
+export function ProductsGrid({ products: serverProducts }: { products: Product[] }) {
   const router = useRouter();
+  // Cópia local para atualizações otimistas (cor/nome mudam imediatamente sem esperar router.refresh)
+  const [products, setProducts] = useState<Product[]>(serverProducts);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  // Sincroniza quando o servidor envia dados frescos (após router.refresh)
+  useEffect(() => { setProducts(serverProducts); }, [serverProducts]);
 
   const hasSelection = selected.size > 0;
   const allSelected = products.length > 0 && selected.size === products.length;
@@ -294,6 +299,15 @@ export function ProductsGrid({ products }: { products: Product[] }) {
         <EditProductModal
           product={editingProduct}
           onClose={() => setEditingProduct(null)}
+          onSaved={(updated) => {
+            // Atualiza o estado local imediatamente (sem esperar router.refresh)
+            setProducts((prev) => prev.map((p) =>
+              p.id === updated.id
+                ? { ...p, name: updated.name, cover_image_url: updated.cover_image_url, product_variants: updated.product_variants.map((uv) => ({ ...uv, inventory: p.product_variants.find((pv) => pv.id === uv.id)?.inventory ?? [] })) }
+                : p
+            ));
+            setEditingProduct(null);
+          }}
         />
       )}
     </div>

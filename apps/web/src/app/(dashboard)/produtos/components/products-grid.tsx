@@ -44,7 +44,7 @@ type Product = {
   status: string;
   cover_image_url: string | null;
   categories: { name: string } | null;
-  product_variants: { id: string; color: string; color_hex: string | null }[];
+  product_variants: { id: string; color: string; color_hex: string | null; inventory: { quantity: number }[] }[];
 };
 
 export function ProductsGrid({ products }: { products: Product[] }) {
@@ -172,6 +172,10 @@ export function ProductsGrid({ products }: { products: Product[] }) {
         {products.map((p) => {
           const variants = p.product_variants ?? [];
           const category = (p.categories as { name: string } | null)?.name;
+          const totalStock = variants.reduce(
+            (sum, v) => sum + (v.inventory ?? []).reduce((s, inv) => s + (inv.quantity ?? 0), 0),
+            0
+          );
           const uniqueColors = variants.filter(
             (v, i, arr) => arr.findIndex((x) => x.color === v.color) === i
           );
@@ -256,6 +260,11 @@ export function ProductsGrid({ products }: { products: Product[] }) {
                   </p>
                   <p className="text-[10px] text-slate-400">
                     {category ?? "Sem categoria"}
+                  </p>
+
+                  {/* Estoque total */}
+                  <p className={`text-[10px] font-semibold ${totalStock > 0 ? "text-emerald-600" : "text-red-400"}`}>
+                    {totalStock} {totalStock === 1 ? "peça" : "peças"}
                   </p>
 
                   {/* Bolinhas de cor */}

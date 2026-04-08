@@ -21,7 +21,7 @@ export default async function ProdutosPage({
     .select(`
       id, name, brand, status, cover_image_url,
       categories(name),
-      product_variants(id, color, color_hex)
+      product_variants(id, color, color_hex, inventory(quantity))
     `)
     .eq("tenant_id", tenantId)
     .is("deleted_at", null)

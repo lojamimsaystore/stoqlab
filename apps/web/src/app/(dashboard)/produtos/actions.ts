@@ -114,7 +114,20 @@ export async function createProductAction(
     return { error: parsed.error.errors[0]?.message ?? "Dados inválidos" };
 
   const { name, categoryId, description, color, size, quantity, salePrice, purchaseDate } = parsed.data;
-  const colorHex = (formData.get("colorHex") as string | null) || null;
+  let colorHex = (formData.get("colorHex") as string | null) || null;
+
+  // Se colorHex não foi informado, herda da paleta do tenant
+  if (!colorHex) {
+    const { data: existingVariant } = await supabaseAdmin
+      .from("product_variants")
+      .select("color_hex")
+      .eq("tenant_id", tenantId)
+      .ilike("color", color)
+      .not("color_hex", "is", null)
+      .limit(1)
+      .maybeSingle();
+    if (existingVariant?.color_hex) colorHex = existingVariant.color_hex;
+  }
 
   // 1. Criar produto
   const { data: product, error: productError } = await supabaseAdmin
@@ -381,13 +394,27 @@ export async function createVariantAction(
   if (!parsed.success)
     return { error: parsed.error.errors[0]?.message ?? "Dados inválidos" };
 
+  // Se colorHex não foi informado, herda do tenant (paleta salva)
+  let resolvedColorHex = parsed.data.colorHex ?? null;
+  if (!resolvedColorHex) {
+    const { data: existing } = await supabaseAdmin
+      .from("product_variants")
+      .select("color_hex")
+      .eq("tenant_id", tenantId)
+      .ilike("color", parsed.data.color)
+      .not("color_hex", "is", null)
+      .limit(1)
+      .maybeSingle();
+    if (existing?.color_hex) resolvedColorHex = existing.color_hex;
+  }
+
   const { data: variant, error } = await supabaseAdmin
     .from("product_variants")
     .insert({
       tenant_id: tenantId,
       product_id: productId,
       color: parsed.data.color,
-      color_hex: parsed.data.colorHex ?? null,
+      color_hex: resolvedColorHex,
       size: parsed.data.size,
       sku: parsed.data.sku,
       barcode: parsed.data.barcode,
@@ -623,10 +650,11 @@ export async function updateProductVariantColorsAction(
     const newColor = u.newColor.trim().toUpperCase();
     if (!newColor) return { error: "Nome de cor não pode ser vazio." };
 
+    // Atualiza em TODOS os produtos do tenant com esse nome de cor,
+    // garantindo consistência da paleta e persistência para produtos futuros.
     const { error } = await supabaseAdmin
       .from("product_variants")
       .update({ color: newColor, color_hex: u.newHex || null })
-      .eq("product_id", productId)
       .eq("tenant_id", tenantId)
       .eq("color", u.oldColor);
 
@@ -635,6 +663,8 @@ export async function updateProductVariantColorsAction(
 
   revalidatePath("/produtos");
   revalidatePath("/compras");
+  revalidatePath("/vendas");
+  revalidatePath("/estoque");
   return {};
 }
 

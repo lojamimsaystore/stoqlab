@@ -30,7 +30,7 @@ type CodeModalState = {
   label: string;
 };
 
-// Linhas de um grupo de cor — gerencia o estado de margem do grupo
+// Linhas de um grupo de cor — entrada manual do valor de venda, margem calculada
 function ColorGroupRows({
   group,
   costMap,
@@ -50,34 +50,30 @@ function ColorGroupRows({
   const avgCost = costs.length > 0 ? costs.reduce((a, b) => a + b, 0) / costs.length : null;
 
   const currentSalePrice = group.variants.find((v) => v.sale_price)?.sale_price ?? null;
-  const initialMarkup =
-    avgCost && currentSalePrice
-      ? Math.round(((Number(currentSalePrice) - avgCost) / avgCost) * 100)
-      : 0;
+  const initialPrice = currentSalePrice ? String(Number(currentSalePrice).toFixed(2)) : "";
 
-  const initialMarkupStr = initialMarkup > 0 ? String(initialMarkup) : "";
-  const [markup, setMarkup] = useState(initialMarkupStr);
+  const [salePrice, setSalePrice] = useState(initialPrice);
   const [isDirty, setIsDirty] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const markupNum = parseFloat(markup.replace(",", ".")) || 0;
-  const finalPrice = avgCost ? avgCost * (1 + markupNum / 100) : null;
-  const profit = avgCost && finalPrice ? finalPrice - avgCost : null;
+  const salePriceNum = parseFloat(salePrice.replace(",", ".")) || 0;
+  const margin = avgCost && salePriceNum > 0 ? ((salePriceNum - avgCost) / salePriceNum) * 100 : null;
+  const profit = avgCost !== null && salePriceNum > 0 ? salePriceNum - avgCost : null;
 
-  function handleMarkupChange(value: string) {
-    setMarkup(value);
-    setIsDirty(value !== initialMarkupStr);
+  function handlePriceChange(value: string) {
+    setSalePrice(value);
+    setIsDirty(value !== initialPrice);
   }
 
   function handleSave() {
-    if (!finalPrice) return;
+    if (!salePriceNum) return;
     const ids = group.variants.map((v) => v.id);
     startTransition(async () => {
-      const result = await updateVariantsSalePriceAction(ids, productId, finalPrice);
+      const result = await updateVariantsSalePriceAction(ids, productId, salePriceNum);
       if (result?.error) {
         toast.error(result.error);
       } else {
-        toast.success(`Preço de ${group.color} atualizado para ${formatCurrency(finalPrice)}`);
+        toast.success(`Preço de ${group.color} atualizado para ${formatCurrency(salePriceNum)}`);
         setIsDirty(false);
       }
     });
@@ -126,45 +122,47 @@ function ColorGroupRows({
               {avgCost !== null ? formatCurrency(avgCost) : <span className="text-slate-300">—</span>}
             </td>
 
-            {/* Margem — input apenas na primeira linha, valor nas demais */}
+            {/* Valor de venda — input na primeira linha, valor nas demais */}
             <td className="px-4 py-2.5">
               {i === 0 ? (
                 <div className="flex items-center gap-0.5">
+                  <span className="text-xs text-slate-400">R$</span>
                   <input
                     type="number"
                     min="0"
-                    max="9999"
-                    value={markup}
-                    onChange={(e) => handleMarkupChange(e.target.value)}
-                    placeholder="0"
-                    className={`w-16 text-xs font-semibold text-slate-700 bg-white border rounded px-1.5 py-0.5 outline-none focus:border-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors ${
+                    step="0.01"
+                    value={salePrice}
+                    onChange={(e) => handlePriceChange(e.target.value)}
+                    placeholder="0,00"
+                    className={`w-20 text-xs font-semibold text-slate-700 bg-white border rounded px-1.5 py-0.5 outline-none focus:border-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors ${
                       isDirty ? "border-amber-400 bg-amber-50" : "border-slate-200"
                     }`}
                   />
-                  <span className="text-xs text-slate-400">%</span>
                 </div>
               ) : (
-                <span className="text-xs text-slate-500">{markup || "0"}%</span>
+                <span className="text-xs text-slate-500">
+                  {salePrice ? formatCurrency(salePriceNum) : "—"}
+                </span>
               )}
             </td>
 
-            {/* Valor final */}
+            {/* Margem calculada */}
             <td className="px-4 py-2.5">
-              <span className={`text-xs font-semibold ${finalPrice ? "text-blue-600" : "text-slate-300"}`}>
-                {finalPrice ? formatCurrency(finalPrice) : "—"}
+              <span className={`text-xs font-semibold ${margin !== null ? (margin >= 0 ? "text-blue-600" : "text-red-500") : "text-slate-300"}`}>
+                {margin !== null ? `${margin.toFixed(1)}%` : "—"}
               </span>
             </td>
 
             {/* Lucro */}
             <td className="px-4 py-2.5">
-              <span className={`text-xs font-semibold ${profit !== null ? "text-emerald-600" : "text-slate-300"}`}>
+              <span className={`text-xs font-semibold ${profit !== null ? (profit >= 0 ? "text-emerald-600" : "text-red-500") : "text-slate-300"}`}>
                 {profit !== null ? formatCurrency(profit) : "—"}
               </span>
             </td>
 
             {/* Lucro total */}
             <td className="px-4 py-2.5">
-              <span className={`text-xs font-semibold ${totalProfit !== null ? "text-emerald-600" : "text-slate-300"}`}>
+              <span className={`text-xs font-semibold ${totalProfit !== null ? (totalProfit >= 0 ? "text-emerald-600" : "text-red-500") : "text-slate-300"}`}>
                 {totalProfit !== null ? formatCurrency(totalProfit) : "—"}
               </span>
             </td>
@@ -172,7 +170,7 @@ function ColorGroupRows({
             {/* Ações */}
             <td className="px-4 py-2.5">
               <div className="flex items-center gap-1">
-                {i === 0 && isDirty && finalPrice && (
+                {i === 0 && isDirty && salePriceNum > 0 && (
                   <button
                     onClick={handleSave}
                     disabled={isPending}
@@ -295,8 +293,8 @@ export function VariantColorGroups({
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[7%]">Peças</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[14%]">SKU</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[11%]">Custo unit.</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[13%]">Margem</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[11%]">Valor final</th>
+                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[13%]">Valor de venda</th>
+                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[11%]">Margem</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Lucro</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Lucro total</th>
                 <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[8%]">Ações</th>

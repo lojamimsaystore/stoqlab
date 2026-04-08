@@ -79,20 +79,12 @@ export function EditProductModal({ product, onClose }: Props) {
       const result = await updateProductBasicInfoAction(product.id, formData);
       if (result.error) { toast.error(result.error); return; }
 
-      // 2. Update changed colors
-      const changedColors = colors.filter(
-        (c) => c.name !== c.original || c.hex !== resolveHex(
-          product.product_variants.find((v) => v.color === c.original)?.color_hex ?? null,
-          c.original,
-        ),
+      // 2. Update all colors (always persist hex, even if visually unchanged)
+      const colorResult = await updateProductVariantColorsAction(
+        product.id,
+        colors.map((c) => ({ oldColor: c.original, newColor: c.name, newHex: c.hex })),
       );
-      if (changedColors.length > 0) {
-        const colorResult = await updateProductVariantColorsAction(
-          product.id,
-          changedColors.map((c) => ({ oldColor: c.original, newColor: c.name, newHex: c.hex })),
-        );
-        if (colorResult.error) { toast.error(colorResult.error); return; }
-      }
+      if (colorResult.error) { toast.error(colorResult.error); return; }
 
       toast.success("Produto atualizado.");
       router.refresh();

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import {
   LayoutDashboard,
   Package,
@@ -67,12 +68,18 @@ export function Sidebar({
 
   function handleColorSelect(hex: string) {
     setCurrentColor(hex);
-    startTransition(() => updateSidebarColorAction(hex));
+    startTransition(async () => {
+      await updateSidebarColorAction(hex);
+      toast.success("Cor da barra atualizada");
+    });
   }
 
   function handleFontColorSelect(hex: string) {
     setCurrentFontColor(hex);
-    startTransition(() => updateSidebarFontColorAction(hex));
+    startTransition(async () => {
+      await updateSidebarFontColorAction(hex);
+      toast.success("Cor da fonte atualizada");
+    });
   }
 
   const visibleItems = NAV_ITEMS.filter(({ href }) => {

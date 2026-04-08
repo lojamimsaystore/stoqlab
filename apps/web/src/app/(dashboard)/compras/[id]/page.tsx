@@ -124,13 +124,14 @@ export default async function CompraDetailPage({ params }: { params: { id: strin
           <h2 className="font-semibold text-slate-900">Itens ({items?.length ?? 0})</h2>
         </div>
         <table className="w-full text-sm">
+          <caption className="sr-only">Itens da compra</caption>
           <thead>
             <tr className="bg-slate-50 text-left border-b border-slate-100">
-              <th className="px-4 py-3 font-medium text-slate-600">Produto / Variação</th>
-              <th className="px-4 py-3 font-medium text-slate-600 text-center">Qtd.</th>
-              <th className="px-4 py-3 font-medium text-slate-600 text-right">Custo unit.</th>
-              <th className="px-4 py-3 font-medium text-slate-600 text-right">Custo real</th>
-              <th className="px-4 py-3 font-medium text-slate-600 text-right">Subtotal</th>
+              <th scope="col" className="px-4 py-3 font-medium text-slate-600">Produto / Variação</th>
+              <th scope="col" className="px-4 py-3 font-medium text-slate-600 text-center">Qtd.</th>
+              <th scope="col" className="px-4 py-3 font-medium text-slate-600 text-right">Custo unit.</th>
+              <th scope="col" className="px-4 py-3 font-medium text-slate-600 text-right">Custo real</th>
+              <th scope="col" className="px-4 py-3 font-medium text-slate-600 text-right">Subtotal</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

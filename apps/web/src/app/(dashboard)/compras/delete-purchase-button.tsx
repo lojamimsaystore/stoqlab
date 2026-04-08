@@ -10,7 +10,7 @@ export function DeletePurchaseButton({ id }: { id: string }) {
     <ConfirmDeleteDialog
       itemName="esta compra"
       title="Remover compra?"
-      description="A compra será removida permanentemente. Atenção: o estoque não será revertido automaticamente."
+      description="A compra será removida permanentemente. O estoque desta compra NÃO será revertido — os itens continuarão no inventário."
       successMessage="Compra removida com sucesso"
       onConfirm={() => deletePurchaseAction(id)}
       onSuccess={() => router.refresh()}

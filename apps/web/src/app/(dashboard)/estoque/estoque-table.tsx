@@ -127,6 +127,8 @@ export function EstoqueTable({ rows, lowStockThreshold = 5 }: { rows: InventoryR
                       {row.categoryName && (
                         <p className="text-xs text-slate-400">{row.categoryName}</p>
                       )}
+                      {/* Local visível só em mobile — coluna "Local" some em telas pequenas */}
+                      <p className="text-xs text-slate-400 md:hidden mt-0.5">{row.locationName}</p>
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       {row.color} · {row.size}

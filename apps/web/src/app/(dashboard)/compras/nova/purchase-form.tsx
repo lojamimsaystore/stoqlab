@@ -4,6 +4,11 @@ import { useFormState, useFormStatus } from "react-dom";
 import { useState, useRef, useCallback, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import { Plus, Trash2, ShoppingCart, Paperclip, Pencil, Check, X, Camera, ChevronDown } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { createPurchaseAction } from "../actions";
 import { uploadTempPhotoAction } from "@/app/(dashboard)/produtos/actions";
@@ -155,6 +160,9 @@ export function PurchaseForm({
   const [dialogQty, setDialogQty] = useState(1);
   const [dialogCost, setDialogCost] = useState(0);
 
+  // Confirmação de remoção de item
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
   const selectedProduct = products.find((p) => p.id === selectedProductId);
   const selectedVariant = selectedProduct?.variants.find((v) => v.id === selectedVariantId);
   const selectedPendingProduct = pendingProducts.find((p) => p.tempId === selectedProductId && !selectedProduct);
@@ -170,6 +178,16 @@ export function PurchaseForm({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Fechar modal de qty/cost com Escape
+  useEffect(() => {
+    if (!qtyPriceDialog) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setQtyPriceDialog(null);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [qtyPriceDialog]);
 
   const filteredProducts = products.filter((p) =>
     !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase())
@@ -274,6 +292,24 @@ export function PurchaseForm({
 
   return (
     <>
+      {/* Confirmação de remoção de item */}
+      <AlertDialog open={!!itemToDelete} onOpenChange={(open) => { if (!open) setItemToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover item?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este item será removido da compra. Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (itemToDelete) { removeItem(itemToDelete); setItemToDelete(null); } }}>
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <QuickAddSupplierModal
         open={supplierModalOpen}
         onClose={() => setSupplierModalOpen(false)}
@@ -378,10 +414,15 @@ export function PurchaseForm({
       {/* Qty/Cost dialog for existing variants */}
       {qtyPriceDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-xs p-5 space-y-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="qty-dialog-title"
+            className="bg-white rounded-xl shadow-xl w-full max-w-xs p-5 space-y-4"
+          >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="font-semibold text-slate-900 text-sm">{qtyPriceDialog.productName}</p>
+                <p id="qty-dialog-title" className="font-semibold text-slate-900 text-sm">{qtyPriceDialog.productName}</p>
                 <p className="text-xs text-slate-500">{qtyPriceDialog.label}</p>
               </div>
               <button type="button" onClick={() => setQtyPriceDialog(null)} className="text-slate-400 hover:text-slate-600 mt-0.5">
@@ -600,16 +641,25 @@ export function PurchaseForm({
                     <div className="flex-1 relative" ref={productComboRef}>
                       <button
                         type="button"
+                        role="combobox"
+                        aria-expanded={productComboOpen}
+                        aria-haspopup="listbox"
+                        aria-controls="product-listbox"
                         onClick={() => { setProductComboOpen((o) => !o); }}
                         className="w-full flex items-center justify-between gap-2 px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <span className={selectedProduct ? "text-slate-800 truncate" : "text-slate-400"}>
                           {selectedProduct?.name ?? "Selecione o produto..."}
                         </span>
-                        <ChevronDown size={13} className="text-slate-400 shrink-0" />
+                        <ChevronDown size={13} aria-hidden="true" className="text-slate-400 shrink-0" />
                       </button>
                       {productComboOpen && (
-                        <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+                        <div
+                          id="product-listbox"
+                          role="listbox"
+                          aria-label="Produtos"
+                          className="absolute left-0 right-0 top-full mt-1 z-40 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden"
+                        >
                           <div className="p-2 border-b border-slate-100">
                             <input
                               autoFocus
@@ -617,6 +667,7 @@ export function PurchaseForm({
                               value={productSearch}
                               onChange={(e) => setProductSearch(e.target.value)}
                               placeholder="Buscar produto..."
+                              aria-label="Buscar produto"
                               className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
@@ -625,6 +676,8 @@ export function PurchaseForm({
                               <button
                                 key={p.id}
                                 type="button"
+                                role="option"
+                                aria-selected={selectedProductId === p.id}
                                 onClick={() => {
                                   setSelectedProductId(p.id);
                                   setSelectedVariantId("");
@@ -729,7 +782,7 @@ export function PurchaseForm({
                                 <button
                                   type="button"
                                   onClick={() => handleImageEdit(item.itemKey)}
-                                  disabled={uploadingImageForKey === item.itemKey}
+                                  disabled={uploadingImageForKey !== null}
                                   title="Trocar imagem"
                                   className="group relative w-5 shrink-0 rounded overflow-hidden bg-slate-100 focus:outline-none"
                                   style={{ aspectRatio: "3/4" }}
@@ -794,8 +847,13 @@ export function PurchaseForm({
                                   <button type="button" onClick={() => startEdit(item)} className="text-slate-300 hover:text-blue-400 transition">
                                     <Pencil size={14} />
                                   </button>
-                                  <button type="button" onClick={() => removeItem(item.itemKey)} className="text-slate-300 hover:text-red-400 transition">
-                                    <Trash2 size={14} />
+                                  <button
+                                    type="button"
+                                    onClick={() => setItemToDelete(item.itemKey)}
+                                    title="Remover item"
+                                    className="text-slate-300 hover:text-red-400 transition"
+                                  >
+                                    <Trash2 size={14} aria-hidden="true" />
                                   </button>
                                 </div>
                               )}
@@ -904,6 +962,7 @@ export function PurchaseForm({
           ref={imageInputRef}
           type="file"
           accept="image/*"
+          disabled={uploadingImageForKey !== null}
           className="hidden"
           onChange={handleImageFileChange}
         />

@@ -139,7 +139,7 @@ export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
                 className="flex items-center gap-1 bg-red-500 hover:bg-red-600 disabled:bg-red-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition"
               >
                 <Check size={12} />
-                {isPending ? "Removendo…" : "Sim, excluir"}
+                {isPending ? `Removendo ${selected.size} compra${selected.size !== 1 ? "s" : ""}…` : "Sim, excluir"}
               </button>
               <button type="button" onClick={() => setConfirmOpen(false)} className="text-xs text-blue-200 hover:text-white font-medium transition">
                 Cancelar
@@ -158,7 +158,8 @@ export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
                   type="checkbox"
                   checked={allSelected}
                   onChange={toggleAll}
-                  className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600"
+                  disabled={isPending}
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
                   title={allSelected ? "Desmarcar todas" : "Selecionar todas"}
                 />
               </th>
@@ -195,7 +196,8 @@ export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => toggleSelect(p.id)}
-                      className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600"
+                      disabled={isPending}
+                      className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
                     />
                   </td>
                   <td className="px-4 py-3 text-slate-700">{formatDate(p.purchased_at)}</td>

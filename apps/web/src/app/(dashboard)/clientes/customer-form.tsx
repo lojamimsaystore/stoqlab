@@ -36,6 +36,11 @@ export function CustomerForm({
 }) {
   const [state, formAction] = useFormState(action, {});
 
+  function fieldClass(fieldName: string) {
+    const hasError = state.field === fieldName;
+    return `w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${hasError ? "border-red-400 bg-red-50" : "border-slate-300"}`;
+  }
+
   // Autocomplete de nome
   const [nameValue, setNameValue] = useState(defaultValues?.name ?? "");
   const [suggestions, setSuggestions] = useState<CustomerSuggestion[]>([]);
@@ -93,7 +98,8 @@ export function CustomerForm({
             onChange={handleNameChange}
             onKeyDown={handleKeyDown}
             onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-invalid={state.field === "name" || undefined}
+            className={fieldClass("name")}
             placeholder="Ex: Maria Silva"
             autoCapitalize="words"
             style={{ textTransform: "none" }}
@@ -135,19 +141,22 @@ export function CustomerForm({
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Telefone / WhatsApp</label>
           <input name="phone" defaultValue={defaultValues?.phone ?? ""}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-invalid={state.field === "phone" || undefined}
+            className={fieldClass("phone")}
             placeholder="(00) 00000-0000" />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
           <input name="email" type="email" defaultValue={defaultValues?.email ?? ""}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-invalid={state.field === "email" || undefined}
+            className={fieldClass("email")}
             placeholder="cliente@email.com" />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">CPF</label>
           <input name="cpf" defaultValue={defaultValues?.cpf ?? ""}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-invalid={state.field === "cpf" || undefined}
+            className={fieldClass("cpf")}
             placeholder="000.000.000-00" />
         </div>
         <div>

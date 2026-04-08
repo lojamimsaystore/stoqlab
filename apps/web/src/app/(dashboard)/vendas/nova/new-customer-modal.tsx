@@ -84,14 +84,19 @@ export function NewCustomerModal({ initial, onConfirm, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
 
-      <div className="relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-customer-dialog-title"
+        className="relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+      >
 
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
           <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-            <UserPlus size={16} className="text-blue-600" />
+            <UserPlus size={16} className="text-blue-600" aria-hidden="true" />
           </div>
-          <h2 className="font-semibold text-slate-900 text-sm flex-1">Novo cliente</h2>
+          <h2 id="new-customer-dialog-title" className="font-semibold text-slate-900 text-sm flex-1">Novo cliente</h2>
           <button type="button" onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
             <X size={16} />
@@ -103,12 +108,13 @@ export function NewCustomerModal({ initial, onConfirm, onClose }: Props) {
 
           {/* Nome */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
+            <label htmlFor="nc-name" className="block text-xs font-medium text-slate-600 mb-1">
               Nome completo <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <User size={13} aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
+                id="nc-name"
                 autoFocus
                 value={name}
                 onChange={(e) => { setName(e.target.value); setErrors([]); }}
@@ -123,8 +129,9 @@ export function NewCustomerModal({ initial, onConfirm, onClose }: Props) {
           {/* CPF + Telefone */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">CPF</label>
+              <label htmlFor="nc-cpf" className="block text-xs font-medium text-slate-600 mb-1">CPF</label>
               <input
+                id="nc-cpf"
                 value={cpf}
                 onChange={(e) => { setCpf(formatCpf(e.target.value)); setErrors([]); }}
                 placeholder="000.000.000-00"
@@ -133,8 +140,9 @@ export function NewCustomerModal({ initial, onConfirm, onClose }: Props) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Telefone</label>
+              <label htmlFor="nc-phone" className="block text-xs font-medium text-slate-600 mb-1">Telefone</label>
               <input
+                id="nc-phone"
                 value={phone}
                 onChange={(e) => { setPhone(formatPhone(e.target.value)); setErrors([]); }}
                 placeholder="(00) 00000-0000"
@@ -146,8 +154,9 @@ export function NewCustomerModal({ initial, onConfirm, onClose }: Props) {
 
           {/* E-mail */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">E-mail</label>
+            <label htmlFor="nc-email" className="block text-xs font-medium text-slate-600 mb-1">E-mail</label>
             <input
+              id="nc-email"
               type="email"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setErrors([]); }}
@@ -159,8 +168,9 @@ export function NewCustomerModal({ initial, onConfirm, onClose }: Props) {
           {/* Nascimento + Endereço */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Nascimento</label>
+              <label htmlFor="nc-birthdate" className="block text-xs font-medium text-slate-600 mb-1">Nascimento</label>
               <input
+                id="nc-birthdate"
                 type="date"
                 value={birthdate}
                 onChange={(e) => setBirthdate(e.target.value)}
@@ -168,8 +178,9 @@ export function NewCustomerModal({ initial, onConfirm, onClose }: Props) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Endereço</label>
+              <label htmlFor="nc-address" className="block text-xs font-medium text-slate-600 mb-1">Endereço</label>
               <input
+                id="nc-address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Rua, número…"

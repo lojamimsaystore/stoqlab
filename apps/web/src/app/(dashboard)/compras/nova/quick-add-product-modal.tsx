@@ -34,7 +34,14 @@ export function QuickAddProductModal({
     if (open) {
       setError("");
       setNameValue(isEdit ? (editProduct?.name ?? "") : (defaultName?.toUpperCase() ?? ""));
-      setCategoryId(isEdit ? (editProduct?.categoryId ?? "") : (defaultCategoryId ?? ""));
+      if (isEdit) {
+        setCategoryId(editProduct?.categoryId ?? "");
+      } else {
+        const lastCategory = typeof window !== "undefined"
+          ? localStorage.getItem("stoqlab_lastCategoryId") ?? ""
+          : "";
+        setCategoryId(defaultCategoryId ?? lastCategory);
+      }
     }
   }, [open, isEdit, editProduct, defaultName, defaultCategoryId]);
 
@@ -95,7 +102,12 @@ export function QuickAddProductModal({
             {categories.length > 0 ? (
               <select
                 value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
+                onChange={(e) => {
+                  setCategoryId(e.target.value);
+                  if (e.target.value) {
+                    localStorage.setItem("stoqlab_lastCategoryId", e.target.value);
+                  }
+                }}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
               >
                 <option value="">Selecione uma categoria...</option>

@@ -36,7 +36,7 @@ function parseForm(formData: FormData) {
   });
 }
 
-export type CustomerState = { error?: string };
+export type CustomerState = { error?: string; field?: string };
 
 export async function createCustomerAction(
   _prev: CustomerState,
@@ -44,7 +44,10 @@ export async function createCustomerAction(
 ): Promise<CustomerState> {
   const tenantId = await getTenantId();
   const parsed = parseForm(formData);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  if (!parsed.success) {
+    const first = parsed.error.errors[0];
+    return { error: first.message, field: String(first.path[0] ?? "") };
+  }
 
   const { error } = await supabaseAdmin.from("customers").insert({
     ...parsed.data,
@@ -53,7 +56,13 @@ export async function createCustomerAction(
     tenant_id: tenantId,
   });
 
-  if (error) return { error: "Erro ao cadastrar cliente." };
+  if (error) {
+    if (error.code === "23505") {
+      if (error.message.includes("email")) return { error: "Este e-mail já está cadastrado para outro cliente.", field: "email" };
+      if (error.message.includes("cpf"))   return { error: "Este CPF já está cadastrado para outro cliente.", field: "cpf" };
+    }
+    return { error: "Erro ao cadastrar cliente. Tente novamente." };
+  }
 
   revalidatePath("/clientes");
   redirect("/clientes");
@@ -66,7 +75,10 @@ export async function updateCustomerAction(
 ): Promise<CustomerState> {
   const tenantId = await getTenantId();
   const parsed = parseForm(formData);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  if (!parsed.success) {
+    const first = parsed.error.errors[0];
+    return { error: first.message, field: String(first.path[0] ?? "") };
+  }
 
   const { error } = await supabaseAdmin
     .from("customers")
@@ -75,7 +87,13 @@ export async function updateCustomerAction(
     .eq("tenant_id", tenantId)
     .is("deleted_at", null);
 
-  if (error) return { error: "Erro ao atualizar cliente." };
+  if (error) {
+    if (error.code === "23505") {
+      if (error.message.includes("email")) return { error: "Este e-mail já está cadastrado para outro cliente.", field: "email" };
+      if (error.message.includes("cpf"))   return { error: "Este CPF já está cadastrado para outro cliente.", field: "cpf" };
+    }
+    return { error: "Erro ao atualizar cliente. Tente novamente." };
+  }
 
   revalidatePath("/clientes");
   redirect("/clientes");

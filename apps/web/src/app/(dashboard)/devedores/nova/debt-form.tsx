@@ -389,17 +389,15 @@ export function DebtForm() {
             </div>
           )}
 
-          <div className="flex gap-3 pt-1">
+          <div className="flex items-center gap-3 pt-1">
+            <SubmitButton disabled={!selectedCustomer || !paidAmount} />
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex-1 py-3 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+              className="text-sm text-slate-500 hover:text-slate-700 font-medium transition"
             >
               Cancelar
             </button>
-            <div className="flex-1">
-              <SubmitButton disabled={!selectedCustomer || !paidAmount} />
-            </div>
           </div>
         </form>
       )}

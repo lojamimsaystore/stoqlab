@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { Trash2, ArrowLeftRight, Search, Package, X, Plus, Minus, Check } from "lucide-react";
 import { createTransferAction } from "../actions";
@@ -56,6 +56,14 @@ function VariantPickerModal({
   const availableVariants = product.variants.filter((v) => (v.stock[fromId] ?? 0) > 0);
   const [qtys, setQtys] = useState<Record<string, number>>({});
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   // Agrupa por cor
   const byColor = useMemo(() => {
     const map = new Map<string, { hex: string | null; sizes: Variant[] }>();
@@ -83,8 +91,13 @@ function VariantPickerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh] overflow-hidden">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="variant-picker-title"
+        className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh] overflow-hidden"
+      >
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
           {product.imageUrl ? (
@@ -92,15 +105,15 @@ function VariantPickerModal({
             <img src={product.imageUrl} alt={product.name} className="w-10 h-10 rounded-lg object-cover" />
           ) : (
             <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-              <Package size={18} className="text-slate-400" />
+              <Package size={18} aria-hidden="true" className="text-slate-400" />
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-slate-900 text-sm truncate">{product.name}</h2>
+            <h2 id="variant-picker-title" className="font-semibold text-slate-900 text-sm truncate">{product.name}</h2>
             <p className="text-xs text-slate-500">{availableVariants.length} variação{availableVariants.length !== 1 ? "ões" : ""} disponível{availableVariants.length !== 1 ? "is" : ""}</p>
           </div>
-          <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
-            <X size={16} />
+          <button type="button" onClick={onClose} aria-label="Fechar" className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
 

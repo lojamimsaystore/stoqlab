@@ -41,8 +41,9 @@ export function VariantForm({
           <input
             name="color"
             required
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Ex: Preto"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+            placeholder="Ex: PRETO"
+            onChange={(e) => { e.target.value = e.target.value.toUpperCase(); }}
           />
         </div>
 

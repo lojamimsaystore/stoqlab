@@ -16,7 +16,7 @@ export default async function NovaCompraPage() {
       .order("name"),
     supabaseAdmin
       .from("product_variants")
-      .select("id, color, size, sku, products(id, name, cover_image_url, category_id)")
+      .select("id, color, color_hex, size, sku, products(id, name, cover_image_url, category_id)")
       .eq("tenant_id", tenantId)
       .is("deleted_at", null)
       .order("created_at"),
@@ -47,7 +47,16 @@ export default async function NovaCompraPage() {
   }
 
   const products = Array.from(productMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  const existingColors = [...new Set((variants ?? []).map((v) => v.color).filter((c): c is string => !!c))];
+  // Monta paleta de cores existentes com hex real (deduplica por nome, prioriza hex não-nulo)
+  const colorHexMap = new Map<string, string | null>();
+  for (const v of variants ?? []) {
+    if (!v.color) continue;
+    const key = v.color.toUpperCase();
+    if (!colorHexMap.has(key) || (v.color_hex && !colorHexMap.get(key))) {
+      colorHexMap.set(key, v.color_hex ?? null);
+    }
+  }
+  const existingColors: { name: string; hex: string | null }[] = Array.from(colorHexMap.entries()).map(([name, hex]) => ({ name, hex }));
 
   return (
     <div className="flex flex-col gap-3 lg:h-full lg:min-h-0">

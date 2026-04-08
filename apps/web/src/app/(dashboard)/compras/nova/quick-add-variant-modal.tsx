@@ -86,7 +86,7 @@ function isLight(hex: string) { return LIGHT_COLORS.has(hex); }
 export function QuickAddVariantModal({
   open, onClose, onCreated, onUpdated,
   productId: _productId, productName, editVariant,
-  existingColorNames = [],
+  existingColorNames = [] as { name: string; hex: string | null }[],
 }: {
   open: boolean;
   onClose: () => void;
@@ -95,7 +95,7 @@ export function QuickAddVariantModal({
   productId: string;
   productName: string;
   editVariant?: PendingVariant;
-  existingColorNames?: string[];
+  existingColorNames?: { name: string; hex: string | null }[];
 }) {
   const isEdit = !!editVariant;
 
@@ -139,8 +139,8 @@ export function QuickAddVariantModal({
 
   // Cores existentes de outros produtos (não estão nos presets)
   const extraExistingColors: ColorEntry[] = existingColorNames
-    .filter((name) => !PRESET_COLORS.some((p) => p.name === name))
-    .map((name) => ({ name, hex: "#9E9E9E" }));
+    .filter((c) => !PRESET_COLORS.some((p) => p.name === c.name))
+    .map((c) => ({ name: c.name, hex: c.hex ?? "#9E9E9E" }));
 
   useEffect(() => {
     if (!open) return;
@@ -152,7 +152,7 @@ export function QuickAddVariantModal({
 
     if (isEdit && editVariant) {
       setEditColorName(editVariant.color);
-      setEditColorHex(PRESET_COLORS.find((c) => c.name === editVariant.color)?.hex ?? "#9E9E9E");
+      setEditColorHex(editVariant.colorHex ?? PRESET_COLORS.find((c) => c.name === editVariant.color)?.hex ?? existingColorNames.find((c) => c.name === editVariant.color)?.hex ?? "#9E9E9E");
       setEditSelectedSizes([editVariant.size]);
       setEditingName(false);
     } else {

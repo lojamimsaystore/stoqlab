@@ -529,7 +529,8 @@ export async function createVariantInlineAction(
   const tenantId = await getTenantId();
 
   const productId = formData.get("productId") as string;
-  const color = (formData.get("color") as string)?.trim();
+  const color = (formData.get("color") as string)?.trim().toUpperCase();
+  const colorHex = (formData.get("colorHex") as string | null) || null;
   const size = formData.get("size") as string;
 
   if (!productId || !color || !size) return { error: "Preencha todos os campos." };
@@ -545,9 +546,23 @@ export async function createVariantInlineAction(
 
   const sku = generateSku(product.name, color, size);
 
+  // Se colorHex não foi informado, herda da paleta do tenant
+  let resolvedColorHex = colorHex;
+  if (!resolvedColorHex) {
+    const { data: existing } = await supabaseAdmin
+      .from("product_variants")
+      .select("color_hex")
+      .eq("tenant_id", tenantId)
+      .ilike("color", color)
+      .not("color_hex", "is", null)
+      .limit(1)
+      .maybeSingle();
+    if (existing?.color_hex) resolvedColorHex = existing.color_hex;
+  }
+
   const { data: variant, error } = await supabaseAdmin
     .from("product_variants")
-    .insert({ tenant_id: tenantId, product_id: productId, color, size, sku, min_stock: 0 })
+    .insert({ tenant_id: tenantId, product_id: productId, color, color_hex: resolvedColorHex, size, sku, min_stock: 0 })
     .select("id, color, size, sku")
     .single();
 

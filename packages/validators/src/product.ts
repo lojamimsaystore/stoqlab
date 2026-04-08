@@ -30,7 +30,8 @@ export const createProductFullSchema = z.object({
   color: z
     .string({ required_error: "Cor obrigatória" })
     .min(1, "Cor obrigatória")
-    .max(60),
+    .max(60)
+    .transform((v) => v.trim().toUpperCase()),
   size: z
     .string({ required_error: "Tamanho obrigatório" })
     .min(1, "Tamanho obrigatório"),
@@ -57,7 +58,7 @@ export const createProductFullSchema = z.object({
 });
 
 export const variantSchema = z.object({
-  color: z.string().min(1).max(60),
+  color: z.string().min(1).max(60).transform((v) => v.trim().toUpperCase()),
   colorHex: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   size: z.string().min(1).max(20),
   sku: z.string().min(1).max(80),

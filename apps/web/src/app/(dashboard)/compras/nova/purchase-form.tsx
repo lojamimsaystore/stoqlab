@@ -120,7 +120,7 @@ export function PurchaseForm({
   suppliers: Supplier[];
   products: Product[];
   categories: Category[];
-  existingColors?: string[];
+  existingColors?: { name: string; hex: string | null }[];
 }) {
   const [state, formAction] = useFormState(createPurchaseAction, {});
   const invoiceFileRef = useRef<HTMLInputElement>(null);

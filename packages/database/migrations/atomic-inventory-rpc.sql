@@ -30,7 +30,7 @@ BEGIN
     -- ── Entrada: upsert atômico (INSERT ou soma ao existente) ──────────
     INSERT INTO inventory (tenant_id, variant_id, location_id, quantity)
     VALUES (p_tenant_id, p_variant_id, p_location_id, p_delta)
-    ON CONFLICT ON CONSTRAINT inventory_tenant_variant_location_unique
+    ON CONFLICT (tenant_id, variant_id, location_id)
     DO UPDATE SET
       quantity   = inventory.quantity + p_delta,
       updated_at = NOW()

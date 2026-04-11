@@ -114,13 +114,12 @@ export function Sidebar({
         <div className={`flex items-center border-b border-slate-800 h-14 shrink-0 ${collapsed ? "justify-center px-3" : "justify-between px-4"}`}>
           {!collapsed && (
             <div className="overflow-hidden flex-1 mr-2">
-              <p className="font-bold text-base leading-none text-white">Stoqlab</p>
-              <p className="text-slate-400 text-xs mt-0.5 truncate">{tenantName}</p>
+              <p className="font-bold text-base leading-none text-white truncate">{tenantName}</p>
             </div>
           )}
           {collapsed && (
             <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">
-              <span className="font-bold text-sm text-white">S</span>
+              <span className="font-bold text-sm text-white">{tenantName.charAt(0).toUpperCase()}</span>
             </div>
           )}
 

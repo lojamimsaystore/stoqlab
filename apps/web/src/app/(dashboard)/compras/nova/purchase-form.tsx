@@ -189,9 +189,14 @@ export function PurchaseForm({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [qtyPriceDialog]);
 
-  const filteredProducts = products.filter((p) =>
-    !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase())
-  );
+  const filteredProducts: Product[] = [
+    ...products.filter((p) =>
+      !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase())
+    ),
+    ...pendingProducts
+      .filter((p) => !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase()))
+      .map((p) => ({ id: p.tempId, name: p.name, categoryId: p.categoryId ?? null, imageUrl: null, variants: [], isPending: true as const })),
+  ];
 
   // Suggested category for the new product modal based on search text
   const suggestedCategoryId = products.find(
@@ -684,8 +689,11 @@ export function PurchaseForm({
                                   setProductComboOpen(false);
                                   setProductSearch("");
                                 }}
-                                className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition ${selectedProductId === p.id ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-800"}`}
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition flex items-center gap-2 ${selectedProductId === p.id ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-800"}`}
                               >
+                                {p.isPending && (
+                                  <span className="text-[10px] bg-amber-200 text-amber-700 rounded px-1 py-0.5 font-semibold shrink-0">NOVO</span>
+                                )}
                                 {p.name}
                               </button>
                             )) : (

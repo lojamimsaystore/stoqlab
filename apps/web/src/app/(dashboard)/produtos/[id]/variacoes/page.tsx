@@ -113,6 +113,7 @@ export default async function VariacoesPage({
         stockMap={stockMap}
         costMap={costMap}
         productId={params.id}
+        productName={product.name}
       />
 
     </div>

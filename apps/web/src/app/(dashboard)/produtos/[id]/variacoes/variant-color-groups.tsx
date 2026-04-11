@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Layers, Trash2, QrCode, Barcode, Check, Loader2 } from "lucide-react";
+import { Layers, Trash2, QrCode, Barcode, Check, Loader2, Printer } from "lucide-react";
 import { deleteVariantAction, updateVariantsSalePriceAction } from "../../actions";
 import { formatCurrency } from "@stoqlab/utils";
 import { toast } from "sonner";
 import { CodeModal } from "./code-modal";
+import { LabelsPrintModal, type LabelVariant } from "./labels-print-modal";
 
 type Variant = {
   id: string;
@@ -30,12 +31,15 @@ type CodeModalState = {
   label: string;
 };
 
-// Linhas de um grupo de cor — entrada manual do valor de venda, margem calculada
+// ── Linhas de um grupo de cor ────────────────────────────────────────────────
+
 function ColorGroupRows({
   group,
   costMap,
   stockMap,
   productId,
+  selectedIds,
+  onToggleSelect,
   onOpenCode,
   onDelete,
 }: {
@@ -43,6 +47,8 @@ function ColorGroupRows({
   costMap: Record<string, number>;
   stockMap: Record<string, number>;
   productId: string;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
   onOpenCode: (type: "qr" | "barcode", sku: string, label: string) => void;
   onDelete: (id: string, label: string) => void;
 }) {
@@ -57,8 +63,10 @@ function ColorGroupRows({
   const [isPending, startTransition] = useTransition();
 
   const salePriceNum = parseFloat(salePrice.replace(",", ".")) || 0;
-  // Markup = (preço - custo) / custo × 100 — pode ultrapassar 100%
-  const margin = avgCost && avgCost > 0 && salePriceNum > 0 ? ((salePriceNum - avgCost) / avgCost) * 100 : null;
+  const margin =
+    avgCost && avgCost > 0 && salePriceNum > 0
+      ? ((salePriceNum - avgCost) / avgCost) * 100
+      : null;
   const profit = avgCost !== null && salePriceNum > 0 ? salePriceNum - avgCost : null;
 
   function handlePriceChange(value: string) {
@@ -88,6 +96,17 @@ function ColorGroupRows({
 
         return (
           <tr key={v.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+
+            {/* Checkbox */}
+            <td className="px-2 py-2.5 text-center">
+              <input
+                type="checkbox"
+                checked={selectedIds.has(v.id)}
+                onChange={() => onToggleSelect(v.id)}
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+            </td>
+
             {/* Cor — só aparece na primeira linha do grupo */}
             <td className="px-4 py-2.5 whitespace-nowrap">
               {i === 0 ? (
@@ -108,9 +127,11 @@ function ColorGroupRows({
 
             {/* Peças */}
             <td className="px-4 py-2.5">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                qty > 0 ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-500"
-              }`}>
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                  qty > 0 ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-500"
+                }`}
+              >
                 {qty}
               </span>
             </td>
@@ -123,7 +144,7 @@ function ColorGroupRows({
               {avgCost !== null ? formatCurrency(avgCost) : <span className="text-slate-300">—</span>}
             </td>
 
-            {/* Valor de venda — input na primeira linha, valor nas demais */}
+            {/* Valor de venda */}
             <td className="px-4 py-2.5">
               {i === 0 ? (
                 <div className="flex items-center gap-0.5">
@@ -147,23 +168,47 @@ function ColorGroupRows({
               )}
             </td>
 
-            {/* Margem calculada */}
+            {/* Markup */}
             <td className="px-4 py-2.5">
-              <span className={`text-xs font-semibold ${margin !== null ? (margin >= 0 ? "text-blue-600" : "text-red-500") : "text-slate-300"}`}>
+              <span
+                className={`text-xs font-semibold ${
+                  margin !== null
+                    ? margin >= 0
+                      ? "text-blue-600"
+                      : "text-red-500"
+                    : "text-slate-300"
+                }`}
+              >
                 {margin !== null ? `${margin.toFixed(1)}%` : "—"}
               </span>
             </td>
 
             {/* Lucro */}
             <td className="px-4 py-2.5">
-              <span className={`text-xs font-semibold ${profit !== null ? (profit >= 0 ? "text-emerald-600" : "text-red-500") : "text-slate-300"}`}>
+              <span
+                className={`text-xs font-semibold ${
+                  profit !== null
+                    ? profit >= 0
+                      ? "text-emerald-600"
+                      : "text-red-500"
+                    : "text-slate-300"
+                }`}
+              >
                 {profit !== null ? formatCurrency(profit) : "—"}
               </span>
             </td>
 
             {/* Lucro total */}
             <td className="px-4 py-2.5">
-              <span className={`text-xs font-semibold ${totalProfit !== null ? (totalProfit >= 0 ? "text-emerald-600" : "text-red-500") : "text-slate-300"}`}>
+              <span
+                className={`text-xs font-semibold ${
+                  totalProfit !== null
+                    ? totalProfit >= 0
+                      ? "text-emerald-600"
+                      : "text-red-500"
+                    : "text-slate-300"
+                }`}
+              >
                 {totalProfit !== null ? formatCurrency(totalProfit) : "—"}
               </span>
             </td>
@@ -178,10 +223,11 @@ function ColorGroupRows({
                     title="Salvar preço"
                     className="p-1 rounded text-emerald-500 hover:text-emerald-700 disabled:opacity-50 transition-colors"
                   >
-                    {isPending
-                      ? <Loader2 size={13} className="animate-spin" />
-                      : <Check size={13} />
-                    }
+                    {isPending ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Check size={13} />
+                    )}
                   </button>
                 )}
                 <button
@@ -214,16 +260,20 @@ function ColorGroupRows({
   );
 }
 
+// ── Componente principal ─────────────────────────────────────────────────────
+
 export function VariantColorGroups({
   variants,
   stockMap,
   costMap,
   productId,
+  productName,
 }: {
   variants: Variant[];
   stockMap: Record<string, number>;
   costMap: Record<string, number>;
   productId: string;
+  productName: string;
 }) {
   const [codeModal, setCodeModal] = useState<CodeModalState>({
     open: false,
@@ -231,6 +281,8 @@ export function VariantColorGroups({
     sku: "",
     label: "",
   });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [printModalOpen, setPrintModalOpen] = useState(false);
 
   if (variants.length === 0) {
     return (
@@ -254,6 +306,27 @@ export function VariantColorGroups({
     seen.get(v.color)!.variants.push(v);
   }
 
+  const allIds = variants.map((v) => v.id);
+  const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
+  const someSelected = !allSelected && allIds.some((id) => selectedIds.has(id));
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allIds));
+    }
+  }
+
+  function toggleOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   async function handleDelete(id: string, label: string) {
     if (!confirm(`Remover "${label}"?`)) return;
     await deleteVariantAction(id, productId);
@@ -265,6 +338,17 @@ export function VariantColorGroups({
 
   const totalStock = variants.reduce((s, v) => s + (stockMap[v.id] ?? 0), 0);
 
+  // Variantes selecionadas para imprimir
+  const selectedVariants: LabelVariant[] = variants
+    .filter((v) => selectedIds.has(v.id))
+    .map((v) => ({
+      id: v.id,
+      sku: v.sku,
+      color: v.color,
+      size: v.size,
+      sale_price: v.sale_price,
+    }));
+
   return (
     <>
       <CodeModal
@@ -275,46 +359,80 @@ export function VariantColorGroups({
         label={codeModal.label}
       />
 
-      {/* Resumo */}
-      <div className="flex items-center gap-4 text-sm text-slate-500 mb-4">
+      <LabelsPrintModal
+        open={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        variants={selectedVariants}
+        productName={productName}
+      />
+
+      {/* Resumo + ação de impressão em lote */}
+      <div className="flex items-center gap-4 text-sm text-slate-500 mb-4 flex-wrap">
         <span>{groups.length} cor{groups.length !== 1 ? "es" : ""}</span>
         <span>·</span>
         <span>{variants.length} produto{variants.length !== 1 ? "s" : ""}</span>
         <span>·</span>
         <span>{totalStock} peças em estoque</span>
+
+        {selectedIds.size > 0 && (
+          <>
+            <span>·</span>
+            <span className="text-blue-600 font-medium">{selectedIds.size} selecionada{selectedIds.size !== 1 ? "s" : ""}</span>
+            <button
+              onClick={() => setPrintModalOpen(true)}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition"
+            >
+              <Printer size={13} />
+              Imprimir etiquetas
+            </button>
+          </>
+        )}
       </div>
 
       {/* Tabela */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <table className="w-full text-sm table-fixed">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[14%]">Cor</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[7%]">Tamanho</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[7%]">Peças</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[14%]">SKU</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[11%]">Custo unit.</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[13%]">Valor de venda</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[11%]">Markup</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Lucro</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Lucro total</th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[8%]">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groups.map((group) => (
-                <ColorGroupRows
-                  key={group.color}
-                  group={group}
-                  costMap={costMap}
-                  stockMap={stockMap}
-                  productId={productId}
-                  onOpenCode={openCode}
-                  onDelete={handleDelete}
+        <table className="w-full text-sm table-fixed">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              {/* Checkbox selecionar todos */}
+              <th className="px-2 py-2.5 w-8 text-center">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = someSelected; }}
+                  onChange={toggleAll}
+                  title="Selecionar todos"
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
-              ))}
-            </tbody>
-          </table>
+              </th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[13%]">Cor</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[7%]">Tamanho</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[6%]">Peças</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[13%]">SKU</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Custo unit.</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[12%]">Valor de venda</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Markup</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[9%]">Lucro</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Lucro total</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[8%]">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map((group) => (
+              <ColorGroupRows
+                key={group.color}
+                group={group}
+                costMap={costMap}
+                stockMap={stockMap}
+                productId={productId}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleOne}
+                onOpenCode={openCode}
+                onDelete={handleDelete}
+              />
+            ))}
+          </tbody>
+        </table>
       </div>
     </>
   );

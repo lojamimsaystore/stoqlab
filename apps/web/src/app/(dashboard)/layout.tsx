@@ -28,8 +28,8 @@ export default async function DashboardLayout({
   const userName = profile?.name ?? "Usuário";
   const userRole = profile?.role ?? "owner";
   const userEmail = user.email ?? "";
-  const tenants = profile?.tenants as unknown as Array<{ name: string }> | null | undefined;
-  const tenantName = Array.isArray(tenants) ? (tenants[0]?.name ?? "Minha Loja") : "Minha Loja";
+  const tenantData = profile?.tenants as unknown as { name: string } | Array<{ name: string }> | null | undefined;
+  const tenantName = (Array.isArray(tenantData) ? tenantData[0]?.name : (tenantData as { name: string } | null)?.name) ?? "Minha Loja";
 
   type LowStockItem = {
     id: string;

@@ -103,7 +103,7 @@ export default async function ScanPage({
         {/* Botão */}
         <div className="px-6 pb-8">
           <Link
-            href={`/vendas/nova?variantId=${variant.id}`}
+            href={`/q/${variant.id}/vender`}
             className="flex items-center justify-center gap-2 w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold rounded-xl text-lg transition-all"
           >
             <ShoppingCart size={22} />

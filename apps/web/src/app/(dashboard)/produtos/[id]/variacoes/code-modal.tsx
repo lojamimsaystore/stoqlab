@@ -11,9 +11,10 @@ type Props = {
   type: "qr" | "barcode";
   sku: string;
   label: string;
+  variantId?: string;
 };
 
-export function CodeModal({ open, onClose, type, sku, label }: Props) {
+export function CodeModal({ open, onClose, type, sku, label, variantId }: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -21,7 +22,11 @@ export function CodeModal({ open, onClose, type, sku, label }: Props) {
     setDataUrl(null);
 
     if (type === "qr") {
-      QRCode.toDataURL(sku, {
+      // QR aponta para a página de scan do produto (abre no celular ao escanear)
+      const qrValue = variantId
+        ? `${window.location.origin}/q/${variantId}`
+        : sku;
+      QRCode.toDataURL(qrValue, {
         width: 300,
         margin: 2,
         color: { dark: "#0f172a", light: "#ffffff" },

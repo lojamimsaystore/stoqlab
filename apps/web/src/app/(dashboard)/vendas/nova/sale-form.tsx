@@ -86,7 +86,15 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
   );
 }
 
-export function SaleForm({ variants, locations }: { variants: Variant[]; locations: Location[] }) {
+export function SaleForm({
+  variants,
+  locations,
+  initialVariantId,
+}: {
+  variants: Variant[];
+  locations: Location[];
+  initialVariantId?: string;
+}) {
   const [state, formAction] = useFormState(createSaleAction, {});
   const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState("");
@@ -116,6 +124,28 @@ export function SaleForm({ variants, locations }: { variants: Variant[]; locatio
   useEffect(() => {
     if (state?.error) toast.error(state.error);
   }, [state]);
+
+  // Pré-seleciona variação vinda do QR code (/vendas/nova?variantId=...)
+  const initialApplied = useRef(false);
+  useEffect(() => {
+    if (initialApplied.current || !initialVariantId || !selectedLocationId) return;
+    const v = variants.find((v) => v.id === initialVariantId);
+    if (!v) return;
+    const stock = v.locationStock[selectedLocationId] ?? 0;
+    if (stock <= 0) return;
+    initialApplied.current = true;
+    setItems([{
+      variantId: v.id,
+      productName: v.productName,
+      color: v.color,
+      colorHex: v.colorHex,
+      size: v.size,
+      coverImageUrl: v.coverImageUrl,
+      quantity: 1,
+      salePrice: v.salePrice,
+      stock,
+    }]);
+  }, [initialVariantId, variants, selectedLocationId]);
 
   function handleCustomerSearch(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;

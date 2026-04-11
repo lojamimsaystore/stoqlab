@@ -10,6 +10,7 @@ export type LabelVariant = {
   color: string;
   size: string;
   sale_price: string | null;
+  quantity: number; // peças em estoque — define quantas etiquetas imprimir
 };
 
 type GeneratedLabel = { variant: LabelVariant; qrDataUrl: string };
@@ -37,9 +38,10 @@ export function LabelsPrintModal({ open, onClose, variants, productName }: Props
     if (!open || variants.length === 0) return;
     setLoading(true);
     setLabels([]);
+    const origin = window.location.origin;
     Promise.all(
       variants.map(async (v) => {
-        const qrDataUrl = await QRCode.toDataURL(v.sku, {
+        const qrDataUrl = await QRCode.toDataURL(`${origin}/q/${v.id}`, {
           width: 160,
           margin: 1,
           color: { dark: "#0f172a", light: "#ffffff" },
@@ -56,12 +58,13 @@ export function LabelsPrintModal({ open, onClose, variants, productName }: Props
     const win = window.open("", "_blank");
     if (!win) return;
 
+    // Gera N cópias de cada etiqueta (uma por peça em estoque)
     const labelsHtml = labels
-      .map(({ variant, qrDataUrl }) => {
+      .flatMap(({ variant, qrDataUrl }) => {
         const price = variant.sale_price
           ? `R$ ${Number(variant.sale_price).toFixed(2).replace(".", ",")}`
           : "";
-        return `
+        const label = `
         <div class="label">
           <div class="info">
             <p class="name">${escapeHtml(productName)}</p>
@@ -73,6 +76,7 @@ export function LabelsPrintModal({ open, onClose, variants, productName }: Props
             <img src="${qrDataUrl}" width="108" height="108" />
           </div>
         </div>`;
+        return Array.from({ length: variant.quantity }, () => label);
       })
       .join("");
 
@@ -127,19 +131,24 @@ export function LabelsPrintModal({ open, onClose, variants, productName }: Props
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900">Imprimir Etiquetas</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {variants.length} etiqueta{variants.length !== 1 ? "s" : ""} · {productName}
-            </p>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition">
-            <X size={18} />
-          </button>
-        </div>
+        {(() => {
+          const totalPecas = variants.reduce((s, v) => s + v.quantity, 0);
+          return (
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">Imprimir Etiquetas</h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {variants.length} variação{variants.length !== 1 ? "ões" : ""} · <span className="font-semibold text-slate-600">{totalPecas} etiqueta{totalPecas !== 1 ? "s" : ""}</span> · {productName}
+                </p>
+              </div>
+              <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition">
+                <X size={18} />
+              </button>
+            </div>
+          );
+        })()}
 
-        {/* Preview */}
+        {/* Preview — 1 card por variação com badge de quantidade */}
         <div className="flex-1 overflow-y-auto p-5">
           {loading ? (
             <div className="flex items-center justify-center h-40 gap-2 text-slate-400">
@@ -169,6 +178,11 @@ export function LabelsPrintModal({ open, onClose, variants, productName }: Props
                       )}
                       <p className="text-[10px] font-mono text-slate-400 truncate">{variant.sku}</p>
                     </div>
+                    {/* Quantidade de etiquetas que serão impressas */}
+                    <div className="shrink-0 flex flex-col items-center justify-center w-10 h-10 rounded-lg bg-blue-50 border border-blue-100">
+                      <span className="text-base font-black text-blue-600 leading-none">{variant.quantity}</span>
+                      <span className="text-[9px] text-blue-400 leading-none mt-0.5">etiq.</span>
+                    </div>
                   </div>
                 );
               })}
@@ -177,22 +191,27 @@ export function LabelsPrintModal({ open, onClose, variants, productName }: Props
         </div>
 
         {/* Footer */}
-        <div className="flex gap-2 px-5 py-4 border-t border-slate-100 shrink-0">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handlePrint}
-            disabled={loading || labels.length === 0}
-            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium text-white transition disabled:opacity-40"
-          >
-            <Printer size={14} />
-            Imprimir {variants.length} etiqueta{variants.length !== 1 ? "s" : ""}
-          </button>
-        </div>
+        {(() => {
+          const totalPecas = variants.reduce((s, v) => s + v.quantity, 0);
+          return (
+            <div className="flex gap-2 px-5 py-4 border-t border-slate-100 shrink-0">
+              <button
+                onClick={onClose}
+                className="flex-1 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handlePrint}
+                disabled={loading || labels.length === 0}
+                className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium text-white transition disabled:opacity-40"
+              >
+                <Printer size={14} />
+                Imprimir {totalPecas} etiqueta{totalPecas !== 1 ? "s" : ""}
+              </button>
+            </div>
+          );
+        })()}
 
       </div>
     </div>

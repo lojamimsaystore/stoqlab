@@ -29,6 +29,7 @@ type CodeModalState = {
   type: "qr" | "barcode";
   sku: string;
   label: string;
+  variantId: string;
 };
 
 // ── Linhas de um grupo de cor ────────────────────────────────────────────────
@@ -49,7 +50,7 @@ function ColorGroupRows({
   productId: string;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
-  onOpenCode: (type: "qr" | "barcode", sku: string, label: string) => void;
+  onOpenCode: (type: "qr" | "barcode", sku: string, label: string, variantId: string) => void;
   onDelete: (id: string, label: string) => void;
 }) {
   const costs = group.variants.map((v) => costMap[v.id]).filter((c) => c !== undefined);
@@ -231,14 +232,14 @@ function ColorGroupRows({
                   </button>
                 )}
                 <button
-                  onClick={() => onOpenCode("qr", v.sku, `${v.color} ${v.size}`)}
+                  onClick={() => onOpenCode("qr", v.sku, `${v.color} ${v.size}`, v.id)}
                   title="QR Code"
                   className="p-1 rounded text-slate-400 hover:text-blue-600 transition-colors"
                 >
                   <QrCode size={13} />
                 </button>
                 <button
-                  onClick={() => onOpenCode("barcode", v.sku, `${v.color} ${v.size}`)}
+                  onClick={() => onOpenCode("barcode", v.sku, `${v.color} ${v.size}`, v.id)}
                   title="Código de Barras"
                   className="p-1 rounded text-slate-400 hover:text-blue-600 transition-colors"
                 >
@@ -280,6 +281,7 @@ export function VariantColorGroups({
     type: "qr",
     sku: "",
     label: "",
+    variantId: "",
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [printModalOpen, setPrintModalOpen] = useState(false);
@@ -332,13 +334,13 @@ export function VariantColorGroups({
     await deleteVariantAction(id, productId);
   }
 
-  function openCode(type: "qr" | "barcode", sku: string, label: string) {
-    setCodeModal({ open: true, type, sku, label });
+  function openCode(type: "qr" | "barcode", sku: string, label: string, variantId: string) {
+    setCodeModal({ open: true, type, sku, label, variantId });
   }
 
   const totalStock = variants.reduce((s, v) => s + (stockMap[v.id] ?? 0), 0);
 
-  // Variantes selecionadas para imprimir
+  // Variantes selecionadas para imprimir — quantity = peças em estoque = nº de etiquetas
   const selectedVariants: LabelVariant[] = variants
     .filter((v) => selectedIds.has(v.id))
     .map((v) => ({
@@ -347,6 +349,7 @@ export function VariantColorGroups({
       color: v.color,
       size: v.size,
       sale_price: v.sale_price,
+      quantity: Math.max(1, stockMap[v.id] ?? 1),
     }));
 
   return (
@@ -357,6 +360,7 @@ export function VariantColorGroups({
         type={codeModal.type}
         sku={codeModal.sku}
         label={codeModal.label}
+        variantId={codeModal.variantId}
       />
 
       <LabelsPrintModal

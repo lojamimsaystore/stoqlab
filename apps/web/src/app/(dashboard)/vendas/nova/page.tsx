@@ -2,7 +2,11 @@ import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
 import { SaleForm } from "./sale-form";
 
-export default async function NovaVendaPage() {
+export default async function NovaVendaPage({
+  searchParams,
+}: {
+  searchParams: { variantId?: string };
+}) {
   const tenantId = await getTenantId();
 
   const [{ data: variantRows }, { data: locationRows }] = await Promise.all([
@@ -71,7 +75,7 @@ export default async function NovaVendaPage() {
   return (
     // Full-screen: cancela o padding do main e ocupa toda a altura disponível
     <div className="-m-4 lg:-m-6 h-[calc(100vh-3.5rem)] flex flex-col overflow-hidden">
-      <SaleForm variants={variants} locations={locations} />
+      <SaleForm variants={variants} locations={locations} initialVariantId={searchParams.variantId} />
     </div>
   );
 }

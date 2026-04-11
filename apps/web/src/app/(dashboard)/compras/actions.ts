@@ -31,9 +31,10 @@ const purchaseSchema = z.object({
 });
 
 function generateSku(name: string, color: string, size: string): string {
-  const clean = (s: string) =>
-    s.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "").slice(0, 6);
-  return `${clean(name)}-${clean(color)}-${size}`;
+  const clean = (s: string, len: number) =>
+    s.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "").slice(0, len);
+  const suffix = Math.floor(Math.random() * 900 + 100); // 3 dígitos — evita colisão de SKU
+  return `${clean(name, 4)}-${clean(color, 4)}-${size}-${suffix}`;
 }
 
 const ALLOWED_INVOICE_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
@@ -289,11 +290,21 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
   }
 
   // 3. Atualizar estoque (atômico via RPC — sem race condition) e registrar movimentações
+  const adjustedItems: { variantId: string; quantity: number }[] = [];
+
   for (const item of resolvedItems) {
     const invResult = await adjustInventory(tenantId, item.variantId, locationId, item.quantity);
     if (!invResult.ok) {
-      console.error("[createPurchase] inventory adjust error:", invResult.message);
+      // Reverter ajustes já aplicados neste loop
+      for (const adj of adjustedItems) {
+        await adjustInventory(tenantId, adj.variantId, locationId, -adj.quantity);
+      }
+      await supabaseAdmin.from("purchase_items").delete().eq("purchase_id", purchase.id);
+      await supabaseAdmin.from("purchases").delete().eq("id", purchase.id);
+      await rollback();
+      return { error: `Erro ao atualizar estoque: ${invResult.message}` };
     }
+    adjustedItems.push({ variantId: item.variantId, quantity: item.quantity });
 
     // Movimento
     await supabaseAdmin.from("inventory_movements").insert({

@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { checkLoginLimit, checkRegisterLimit } from "@/lib/rate-limit";
 
-const PUBLIC_PATHS = ["/login", "/registro"];
+const PUBLIC_PATHS = ["/login", "/registro", "/q/"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

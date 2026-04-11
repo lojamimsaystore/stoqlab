@@ -28,7 +28,7 @@ export default async function ScanPage({
   // ── Busca variação + produto ────────────────────────────────────────────
   const { data: variant } = await supabaseAdmin
     .from("product_variants")
-    .select("id, sku, color, color_hex, size, sale_price, products(name, brand, cover_image_url)")
+    .select("id, sku, color, color_hex, size, sale_price, products(name, cover_image_url)")
     .eq("id", params.id)
     .eq("tenant_id", profile.tenant_id)
     .is("deleted_at", null)
@@ -38,7 +38,6 @@ export default async function ScanPage({
 
   const product = variant.products as unknown as {
     name: string;
-    brand: string | null;
     cover_image_url: string | null;
   } | null;
 
@@ -71,9 +70,6 @@ export default async function ScanPage({
             <h1 className="text-xl font-bold text-slate-900 leading-tight">
               {product?.name ?? "Produto"}
             </h1>
-            {product?.brand && (
-              <p className="text-sm text-slate-400 mt-0.5">{product.brand}</p>
-            )}
           </div>
 
           {/* Cor + Tamanho */}

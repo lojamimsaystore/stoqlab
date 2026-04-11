@@ -2,7 +2,8 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
-import { inviteUserAction, updateUserRoleAction, toggleUserActiveAction } from "./actions";
+import { Trash2 } from "lucide-react";
+import { inviteUserAction, updateUserRoleAction, toggleUserActiveAction, deleteUserAction } from "./actions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -39,6 +40,13 @@ export function TabUsuarios({ users, currentUserId }: {
   async function handleToggle(id: string, active: boolean) {
     await toggleUserActiveAction(id, active);
     router.refresh();
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Excluir "${name}"? Esta ação não pode ser desfeita.`)) return;
+    const result = await deleteUserAction(id);
+    if (result.error) alert(result.error);
+    else router.refresh();
   }
 
   return (
@@ -91,10 +99,17 @@ export function TabUsuarios({ users, currentUserId }: {
                 </td>
                 <td className="px-4 py-2.5 text-right">
                   {u.id !== currentUserId && (
-                    <button onClick={() => handleToggle(u.id, !u.is_active)}
-                      className="text-xs text-slate-400 hover:text-slate-700 font-medium">
-                      {u.is_active ? "Desativar" : "Ativar"}
-                    </button>
+                    <div className="flex items-center justify-end gap-3">
+                      <button onClick={() => handleToggle(u.id, !u.is_active)}
+                        className="text-xs text-slate-400 hover:text-slate-700 font-medium">
+                        {u.is_active ? "Desativar" : "Ativar"}
+                      </button>
+                      <button onClick={() => handleDelete(u.id, u.name)}
+                        className="text-slate-300 hover:text-red-500 transition"
+                        title="Excluir usuário">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>

@@ -330,3 +330,45 @@ export async function toggleUserActiveAction(id: string, active: boolean): Promi
 
   revalidatePath("/configuracoes");
 }
+
+export async function deleteUserAction(id: string): Promise<{ error?: string }> {
+  const tenantId = await getTenantId();
+
+  const supabase = await createClient();
+  const { data: { user: currentUser } } = await supabase.auth.getUser();
+  if (!currentUser) return { error: "Não autenticado." };
+  if (id === currentUser.id) return { error: "Você não pode excluir sua própria conta." };
+
+  // Garante que o usuário pertence ao mesmo tenant
+  const { data: target } = await supabaseAdmin
+    .from("users")
+    .select("id, name, email")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (!target) return { error: "Usuário não encontrado." };
+
+  // Remove da tabela de usuários
+  const { error: dbError } = await supabaseAdmin
+    .from("users")
+    .delete()
+    .eq("id", id)
+    .eq("tenant_id", tenantId);
+
+  if (dbError) return { error: "Erro ao excluir usuário." };
+
+  // Remove do Supabase Auth
+  await supabaseAdmin.auth.admin.deleteUser(id);
+
+  await writeAuditLog({
+    tenantId,
+    action: "user.deleted",
+    tableName: "users",
+    recordId: id,
+    oldData: target as unknown as Record<string, unknown>,
+  });
+
+  revalidatePath("/configuracoes");
+  return {};
+}

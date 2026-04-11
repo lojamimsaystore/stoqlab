@@ -342,7 +342,7 @@ export async function deleteUserAction(id: string): Promise<{ error?: string }> 
   // Garante que o usuário pertence ao mesmo tenant
   const { data: target } = await supabaseAdmin
     .from("users")
-    .select("id, name, email")
+    .select("id, name")
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .single();
@@ -359,7 +359,11 @@ export async function deleteUserAction(id: string): Promise<{ error?: string }> 
   if (dbError) return { error: "Erro ao excluir usuário." };
 
   // Remove do Supabase Auth
-  await supabaseAdmin.auth.admin.deleteUser(id);
+  const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
+  if (authError) {
+    // Loga mas não falha — o registro da tabela já foi removido
+    console.error("Erro ao remover do Auth:", authError.message);
+  }
 
   await writeAuditLog({
     tenantId,

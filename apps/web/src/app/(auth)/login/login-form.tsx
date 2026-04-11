@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertCircle, Lock } from "lucide-react";
 import { loginAction } from "./actions";
 import { GoogleButton } from "@/components/auth/google-button";
 
@@ -26,6 +26,7 @@ export function LoginForm({ next }: { next: string }) {
   const router = useRouter();
   const [state, action] = useFormState(loginAction, {});
   const [showPassword, setShowPassword] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
 
   useEffect(() => {
     if (state.success) {
@@ -84,6 +85,9 @@ export function LoginForm({ next }: { next: string }) {
               required
               className="w-full px-3 py-2.5 pr-10 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all placeholder:text-slate-400"
               placeholder="••••••••"
+              onKeyUp={(e) => setCapsLock(e.getModifierState("CapsLock"))}
+              onFocus={(e) => setCapsLock(e.nativeEvent.getModifierState("CapsLock"))}
+              onBlur={() => setCapsLock(false)}
             />
             <button
               type="button"
@@ -95,6 +99,12 @@ export function LoginForm({ next }: { next: string }) {
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
+          {capsLock && (
+            <div className="flex items-center gap-1.5 mt-1.5 text-xs text-amber-600">
+              <Lock size={12} />
+              Caps Lock está ativado
+            </div>
+          )}
         </div>
 
         {state.error && (

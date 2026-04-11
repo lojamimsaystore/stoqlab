@@ -19,14 +19,18 @@ export default async function ConfiguracoesPage() {
       supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
     ]);
 
-  const emailMap: Record<string, string> = {};
+  const authUserMap: Record<string, { email: string; confirmed: boolean }> = {};
   for (const u of authData?.users ?? []) {
-    emailMap[u.id] = u.email ?? "";
+    authUserMap[u.id] = {
+      email: u.email ?? "",
+      confirmed: !!u.email_confirmed_at,
+    };
   }
 
   const usersWithEmail = (users ?? []).map((u) => ({
     ...u,
-    email: emailMap[u.id] ?? "",
+    email: authUserMap[u.id]?.email ?? "",
+    confirmed: authUserMap[u.id]?.confirmed ?? true,
   }));
 
   return (

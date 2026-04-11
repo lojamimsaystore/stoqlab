@@ -282,6 +282,38 @@ export async function inviteUserAction(
   return { success: true };
 }
 
+export async function resendInviteAction(id: string): Promise<{ error?: string }> {
+  const tenantId = await getTenantId();
+
+  // Garante que o usuário pertence ao mesmo tenant
+  const { data: target } = await supabaseAdmin
+    .from("users")
+    .select("id, name")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (!target) return { error: "Usuário não encontrado." };
+
+  // Busca o email no Auth
+  const { data: authUser, error: authErr } = await supabaseAdmin.auth.admin.getUserById(id);
+  if (authErr || !authUser.user?.email) return { error: "Não foi possível obter o e-mail do usuário." };
+
+  const headersList = await headers();
+  const host = headersList.get("host") ?? "localhost:3000";
+  const proto = headersList.get("x-forwarded-proto") ?? "http";
+  const appUrl = `${proto}://${host}`;
+
+  const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+    authUser.user.email,
+    { redirectTo: `${appUrl}/auth/callback?next=/convite` }
+  );
+
+  if (error) return { error: "Erro ao reenviar convite." };
+
+  return {};
+}
+
 export async function updateUserRoleAction(id: string, role: string): Promise<void> {
   const tenantId = await getTenantId();
   if (!VALID_ROLES.includes(role as typeof VALID_ROLES[number])) return;

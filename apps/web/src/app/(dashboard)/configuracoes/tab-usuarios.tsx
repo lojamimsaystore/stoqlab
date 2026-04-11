@@ -2,8 +2,9 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
-import { inviteUserAction, updateUserRoleAction, toggleUserActiveAction, deleteUserAction } from "./actions";
+import { useState } from "react";
+import { Trash2, Send } from "lucide-react";
+import { inviteUserAction, updateUserRoleAction, toggleUserActiveAction, deleteUserAction, resendInviteAction } from "./actions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -26,11 +27,12 @@ const ROLE_COLOR: Record<string, string> = {
 };
 
 export function TabUsuarios({ users, currentUserId }: {
-  users: { id: string; name: string; email: string; role: string; is_active: boolean }[];
+  users: { id: string; name: string; email: string; role: string; is_active: boolean; confirmed: boolean }[];
   currentUserId: string;
 }) {
   const [state, formAction] = useFormState(inviteUserAction, {});
   const router = useRouter();
+  const [resending, setResending] = useState<string | null>(null);
 
   async function handleRoleChange(id: string, role: string) {
     await updateUserRoleAction(id, role);
@@ -49,6 +51,14 @@ export function TabUsuarios({ users, currentUserId }: {
     else router.refresh();
   }
 
+  async function handleResendInvite(id: string, name: string) {
+    setResending(id);
+    const result = await resendInviteAction(id);
+    setResending(null);
+    if (result.error) alert(result.error);
+    else alert(`Convite reenviado para ${name}!`);
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -64,6 +74,7 @@ export function TabUsuarios({ users, currentUserId }: {
               <th className="px-4 py-2 font-medium text-slate-600">Nome</th>
               <th className="px-4 py-2 font-medium text-slate-600">E-mail</th>
               <th className="px-4 py-2 font-medium text-slate-600">Perfil</th>
+              <th className="px-4 py-2 font-medium text-slate-600 text-center">Conta</th>
               <th className="px-4 py-2 font-medium text-slate-600 text-center">Status</th>
               <th className="px-4 py-2" />
             </tr>
@@ -93,13 +104,29 @@ export function TabUsuarios({ users, currentUserId }: {
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-center">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${u.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${u.confirmed ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                    {u.confirmed ? "Confirmado" : "Pendente"}
+                  </span>
+                </td>
+                <td className="px-4 py-2.5 text-center">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${u.is_active ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-400"}`}>
                     {u.is_active ? "Ativo" : "Inativo"}
                   </span>
                 </td>
                 <td className="px-4 py-2.5 text-right">
                   {u.id !== currentUserId && (
-                    <div className="flex items-center justify-end gap-3">
+                    <div className="flex items-center justify-end gap-2">
+                      {!u.confirmed && (
+                        <button
+                          onClick={() => handleResendInvite(u.id, u.name)}
+                          disabled={resending === u.id}
+                          className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 font-medium disabled:opacity-50 transition"
+                          title="Reenviar e-mail de convite"
+                        >
+                          <Send size={12} />
+                          {resending === u.id ? "Enviando…" : "Reenviar convite"}
+                        </button>
+                      )}
                       <button onClick={() => handleToggle(u.id, !u.is_active)}
                         className="text-xs text-slate-400 hover:text-slate-700 font-medium">
                         {u.is_active ? "Desativar" : "Ativar"}

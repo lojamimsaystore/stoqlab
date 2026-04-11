@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Menu, Bell, Maximize2, Minimize2, LogOut, Settings, User, AlertTriangle, Package } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -50,16 +50,48 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
+const SEEN_KEY = "stoqlab_seen_low_stock";
+
+function loadSeenIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(SEEN_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistSeenIds(ids: Set<string>) {
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...ids]));
+  } catch {}
+}
+
 export function Header({ onMenuClick, userName, userEmail, userRole, lowStockItems = [], lowStockThreshold = 5 }: HeaderProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const router = useRouter();
+
+  // Carrega IDs vistos do localStorage após hydration
+  useEffect(() => {
+    setSeenIds(loadSeenIds());
+  }, []);
 
   const handleLogout = useCallback(async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
   }, [router]);
-  const lowStockCount = lowStockItems.length;
+
+  const unseenCount = lowStockItems.filter((item) => !seenIds.has(item.id)).length;
+
+  function handleNotifOpenChange(open: boolean) {
+    if (!open) return;
+    const updated = new Set(seenIds);
+    for (const item of lowStockItems) updated.add(item.id);
+    setSeenIds(updated);
+    persistSeenIds(updated);
+  }
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -93,16 +125,16 @@ export function Header({ onMenuClick, userName, userEmail, userRole, lowStockIte
         </button>
 
         {/* Notificações */}
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={handleNotifOpenChange}>
           <DropdownMenuTrigger asChild>
             <button
               aria-label="Notificações"
               className="relative p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
             >
-              <Bell size={18} className={lowStockCount > 0 ? "text-amber-500" : ""} />
-              {lowStockCount > 0 && (
+              <Bell size={18} className={unseenCount > 0 ? "text-amber-500" : ""} />
+              {unseenCount > 0 && (
                 <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold leading-none text-white">
-                  {lowStockCount > 99 ? "99+" : lowStockCount}
+                  {unseenCount > 99 ? "99+" : unseenCount}
                 </span>
               )}
             </button>
@@ -115,7 +147,7 @@ export function Header({ onMenuClick, userName, userEmail, userRole, lowStockIte
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
 
-            {lowStockCount === 0 ? (
+            {lowStockItems.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-6 text-center text-slate-400">
                 <Package size={28} className="text-slate-300" />
                 <p className="text-sm">Nenhum alerta de estoque</p>
@@ -125,7 +157,7 @@ export function Header({ onMenuClick, userName, userEmail, userRole, lowStockIte
                 <div className="px-3 py-2">
                   <div className="flex items-center gap-2 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                     <AlertTriangle size={13} className="shrink-0" />
-                    {lowStockCount} item{lowStockCount !== 1 ? "s" : ""} com estoque baixo (até {lowStockThreshold} unidades)
+                    {lowStockItems.length} item{lowStockItems.length !== 1 ? "s" : ""} com estoque baixo (até {lowStockThreshold} unidades)
                   </div>
                 </div>
                 <div className="max-h-64 overflow-y-auto">

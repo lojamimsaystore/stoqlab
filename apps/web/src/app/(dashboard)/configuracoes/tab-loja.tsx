@@ -23,7 +23,7 @@ export function TabLoja({ tenant }: {
       <h2 className="font-semibold text-slate-900 mb-1">Dados da loja</h2>
       <p className="text-sm text-slate-500 mb-5">Informações gerais do seu negócio.</p>
 
-      <form action={formAction} className="space-y-4 max-w-lg">
+      <form action={formAction} className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
             Nome da loja <span className="text-red-500">*</span>
@@ -37,17 +37,17 @@ export function TabLoja({ tenant }: {
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="(00) 00000-0000" />
         </div>
-        <div>
+        <div className="md:col-span-2">
           <label className="block text-sm font-medium text-slate-700 mb-1">Endereço</label>
           <input name="address" defaultValue={(tenant.settings?.address as string) ?? ""}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Rua, número, cidade..." />
         </div>
 
-        {state.error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{state.error}</p>}
-        {state.success && <p className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">Dados atualizados com sucesso!</p>}
+        {state.error && <p className="md:col-span-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{state.error}</p>}
+        {state.success && <p className="md:col-span-2 text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">Dados atualizados com sucesso!</p>}
 
-        <SubmitButton />
+        <div><SubmitButton /></div>
       </form>
     </div>
   );

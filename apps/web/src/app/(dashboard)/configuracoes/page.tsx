@@ -30,7 +30,7 @@ export default async function ConfiguracoesPage() {
   }));
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Configurações</h1>
         <p className="text-sm text-slate-500 mt-1">Gerencie sua loja, conta e equipe.</p>

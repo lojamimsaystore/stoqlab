@@ -110,7 +110,7 @@ export function TabUsuarios({ users, currentUserId }: {
         <h3 className="font-semibold text-slate-900 mb-1">Convidar usuário</h3>
         <p className="text-sm text-slate-500 mb-4">O usuário receberá acesso imediato ao sistema.</p>
 
-        <form action={formAction} className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
+        <form action={formAction} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <input name="name" required placeholder="Nome completo"
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           <input name="email" type="email" required placeholder="E-mail"

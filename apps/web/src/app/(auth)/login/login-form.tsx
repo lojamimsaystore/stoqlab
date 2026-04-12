@@ -106,6 +106,16 @@ export function LoginForm({ next }: { next: string }) {
           )}
         </div>
 
+        <div className="text-right -mt-1">
+          <button
+            type="button"
+            onClick={() => router.push("/esqueci-senha")}
+            className="text-xs text-blue-600 hover:underline"
+          >
+            Esqueci minha senha
+          </button>
+        </div>
+
         {state.error && (
           <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">
             <AlertCircle size={15} className="shrink-0" />
@@ -116,13 +126,7 @@ export function LoginForm({ next }: { next: string }) {
         <SubmitButton />
       </form>
 
-      <div className="mt-3 text-right">
-        <Link href="/esqueci-senha" className="text-xs text-blue-600 hover:underline">
-          Esqueci minha senha
-        </Link>
-      </div>
-
-      <p className="mt-4 text-center text-sm text-slate-500">
+      <p className="mt-6 text-center text-sm text-slate-500">
         Não tem conta?{" "}
         <Link href="/registro" className="text-blue-600 font-medium hover:underline">
           Criar conta grátis

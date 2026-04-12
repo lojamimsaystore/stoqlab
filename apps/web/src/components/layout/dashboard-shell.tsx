@@ -88,6 +88,7 @@ export function DashboardShell({
         collapsed={collapsed}
         onToggleCollapse={handleToggleCollapse}
         userPermissions={userPermissions}
+        userActionPermissions={userActionPermissions}
         userRole={userRole}
         sidebarColor={sidebarColor}
         sidebarFontColor={sidebarFontColor}

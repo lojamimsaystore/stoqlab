@@ -32,7 +32,10 @@ export const ACTION_KEYS = [
   // Fornecedores
   "fornecedor.gerenciar",
   // Clientes
-  "cliente.gerenciar",
+  "cliente.criar",
+  "cliente.editar",
+  "cliente.excluir",
+  "cliente.menu",
   // Devedores
   "devedor.adicionar_pagamento",
   "devedor.aumentar_divida",
@@ -122,7 +125,10 @@ export const ACTION_GROUPS: {
     label: "Clientes",
     type: "action",
     items: [
-      { key: "cliente.gerenciar", label: "Criar / editar / excluir cliente" },
+      { key: "cliente.criar",   label: "Criar cliente" },
+      { key: "cliente.editar",  label: "Editar cliente" },
+      { key: "cliente.excluir", label: "Excluir cliente" },
+      { key: "cliente.menu",    label: "Menu Clientes (barra lateral)" },
     ],
   },
   {
@@ -170,7 +176,7 @@ export const DEFAULT_ACTION_PERMISSIONS: Record<"manager" | "seller" | "stock_op
     "venda.criar", "venda.cancelar", "venda.editar", "venda.imprimir",
     "estoque.ajustar",
     "transferencia.criar",
-    "fornecedor.gerenciar", "cliente.gerenciar",
+    "fornecedor.gerenciar", "cliente.criar", "cliente.editar", "cliente.excluir", "cliente.menu",
     "devedor.adicionar_pagamento", "devedor.aumentar_divida",
     "info.preco_venda", "info.custo_compra", "info.custo_real", "info.custos_extras",
     "info.total_compra", "info.margem", "info.desconto", "info.faturamento",
@@ -179,7 +185,7 @@ export const DEFAULT_ACTION_PERMISSIONS: Record<"manager" | "seller" | "stock_op
   ],
   seller: [
     "venda.criar", "venda.imprimir",
-    "cliente.gerenciar",
+    "cliente.criar",
     "info.preco_venda", "info.desconto",
   ],
   stock_operator: [
@@ -206,7 +212,7 @@ export function resolveActionPermissions(
   }
 
   const savedForRole = saved?.[role];
-  if (Array.isArray(savedForRole) && savedForRole.length > 0) {
+  if (saved && role in saved && Array.isArray(savedForRole)) {
     return new Set(savedForRole as ActionKey[]);
   }
 

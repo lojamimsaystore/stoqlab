@@ -52,6 +52,7 @@ type SidebarProps = {
   collapsed: boolean;
   onToggleCollapse: () => void;
   userPermissions?: string[];
+  userActionPermissions?: string[];
   userRole?: string;
   sidebarColor?: string;
   sidebarFontColor?: string;
@@ -59,7 +60,7 @@ type SidebarProps = {
 
 export function Sidebar({
   open, onClose, tenantName, userName, collapsed, onToggleCollapse,
-  userPermissions = [], userRole = "owner", sidebarColor, sidebarFontColor,
+  userPermissions = [], userActionPermissions = [], userRole = "owner", sidebarColor, sidebarFontColor,
 }: SidebarProps) {
   const pathname = usePathname();
   const [currentColor, setCurrentColor] = useState(sidebarColor ?? "#0f172a");
@@ -85,6 +86,9 @@ export function Sidebar({
   const visibleItems = NAV_ITEMS.filter(({ href }) => {
     if (userRole === "owner" || userRole === "master") return true;
     const key = href === "/" ? "dashboard" : href.slice(1);
+    if (key === "clientes") {
+      return userPermissions.includes(key) && userActionPermissions.includes("cliente.menu");
+    }
     return userPermissions.includes(key);
   });
 
@@ -199,43 +203,45 @@ export function Sidebar({
             </div>
           )}
 
-          {/* Seletores de cor */}
-          {collapsed ? (
-            <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <label className="flex w-full items-center justify-center h-10 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" style={{ color: currentFontColor + "99" }}>
-                    <Palette size={18} />
-                    <input type="color" value={currentColor} onChange={(e) => handleColorSelect(e.target.value)} className="sr-only" />
-                  </label>
-                </TooltipTrigger>
-                <TooltipContent side="right">Cor da barra lateral</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <label className="flex w-full items-center justify-center h-10 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" style={{ color: currentFontColor + "99" }}>
-                    <span className="text-xs font-bold">A</span>
-                    <input type="color" value={currentFontColor} onChange={(e) => handleFontColorSelect(e.target.value)} className="sr-only" />
-                  </label>
-                </TooltipTrigger>
-                <TooltipContent side="right">Cor da fonte</TooltipContent>
-              </Tooltip>
-            </>
-          ) : (
-            <>
-              <label className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors cursor-pointer" style={{ color: currentFontColor + "99" }}>
-                <Palette size={16} className="shrink-0" />
-                <span>Cor da barra</span>
-                <span className="ml-auto w-4 h-4 rounded-full border-2 border-white/30 shrink-0" style={{ backgroundColor: currentColor }} />
-                <input type="color" value={currentColor} onChange={(e) => handleColorSelect(e.target.value)} className="sr-only" />
-              </label>
-              <label className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors cursor-pointer" style={{ color: currentFontColor + "99" }}>
-                <span className="text-base font-bold shrink-0">A</span>
-                <span>Cor da fonte</span>
-                <span className="ml-auto w-4 h-4 rounded-full border-2 border-white/30 shrink-0" style={{ backgroundColor: currentFontColor }} />
-                <input type="color" value={currentFontColor} onChange={(e) => handleFontColorSelect(e.target.value)} className="sr-only" />
-              </label>
-            </>
+          {/* Seletores de cor — apenas o proprietário pode editar */}
+          {(userRole === "owner" || userRole === "master") && (
+            collapsed ? (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <label className="flex w-full items-center justify-center h-10 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" style={{ color: currentFontColor + "99" }}>
+                      <Palette size={18} />
+                      <input type="color" value={currentColor} onChange={(e) => handleColorSelect(e.target.value)} className="sr-only" />
+                    </label>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Cor da barra lateral</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <label className="flex w-full items-center justify-center h-10 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" style={{ color: currentFontColor + "99" }}>
+                      <span className="text-xs font-bold">A</span>
+                      <input type="color" value={currentFontColor} onChange={(e) => handleFontColorSelect(e.target.value)} className="sr-only" />
+                    </label>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Cor da fonte</TooltipContent>
+                </Tooltip>
+              </>
+            ) : (
+              <>
+                <label className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors cursor-pointer" style={{ color: currentFontColor + "99" }}>
+                  <Palette size={16} className="shrink-0" />
+                  <span>Cor da barra</span>
+                  <span className="ml-auto w-4 h-4 rounded-full border-2 border-white/30 shrink-0" style={{ backgroundColor: currentColor }} />
+                  <input type="color" value={currentColor} onChange={(e) => handleColorSelect(e.target.value)} className="sr-only" />
+                </label>
+                <label className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors cursor-pointer" style={{ color: currentFontColor + "99" }}>
+                  <span className="text-base font-bold shrink-0">A</span>
+                  <span>Cor da fonte</span>
+                  <span className="ml-auto w-4 h-4 rounded-full border-2 border-white/30 shrink-0" style={{ backgroundColor: currentFontColor }} />
+                  <input type="color" value={currentFontColor} onChange={(e) => handleFontColorSelect(e.target.value)} className="sr-only" />
+                </label>
+              </>
+            )
           )}
         </div>
       </aside>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useFormState, useFormStatus } from "react-dom";
+import { useRouter } from "next/navigation";
 import { Info, Lock, Shield, ChevronDown, ChevronRight } from "lucide-react";
 import { ACTION_GROUPS, resolveActionPermissions } from "@/lib/action-permissions";
 import type { ActionKey } from "@/lib/action-permissions";
@@ -32,6 +33,11 @@ export function TabPermissoes({
   savedActionPermissions: Record<string, ActionKey[]> | undefined;
 }) {
   const [state, formAction] = useFormState(saveActionPermissionsAction, {});
+  const router = useRouter();
+
+  useEffect(() => {
+    if (state.success) router.refresh();
+  }, [state]);
 
   // Grupos abertos por padrão
   const [openGroups, setOpenGroups] = useState<Set<string>>(

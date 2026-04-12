@@ -147,6 +147,7 @@ export async function createSaleAction(
       tenant_id: tenantId,
       location_id: locationId,
       customer_id: resolvedCustomerId,
+      sold_by: user.id,
       status: "completed",
       channel: parsed.data.channel,
       payment_method: actualPaymentMethod,

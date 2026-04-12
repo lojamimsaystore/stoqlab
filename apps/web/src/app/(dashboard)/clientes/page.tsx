@@ -23,8 +23,10 @@ export default async function ClientesPage({
     : { data: null };
   const role = profile?.role ?? "seller";
   const perms = await getUserActionPerms(role, tenantId);
-  const canGerenciar = perms.has("cliente.gerenciar");
-  const canVerCpf    = perms.has("info.cpf_cliente");
+  const canCriar   = perms.has("cliente.criar");
+  const canEditar  = perms.has("cliente.editar");
+  const canExcluir = perms.has("cliente.excluir");
+  const canVerCpf  = perms.has("info.cpf_cliente");
 
   let query = supabaseAdmin
     .from("customers")
@@ -49,7 +51,7 @@ export default async function ClientesPage({
             {q ? ` encontrado${(customers?.length ?? 0) !== 1 ? "s" : ""} para "${q}"` : " cadastrado" + ((customers?.length ?? 0) !== 1 ? "s" : "")}
           </p>
         </div>
-        {canGerenciar && (
+        {canCriar && (
           <Link
             href="/clientes/novo"
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
@@ -72,7 +74,7 @@ export default async function ClientesPage({
             <p className="text-sm font-medium text-slate-500">
               {q ? `Nenhum cliente encontrado para "${q}"` : "Nenhum cliente cadastrado"}
             </p>
-            {!q && (
+            {!q && canCriar && (
               <Link href="/clientes/novo" className="text-sm text-blue-600 hover:text-blue-700 font-medium mt-1">
                 Cadastrar primeiro cliente
               </Link>
@@ -85,7 +87,7 @@ export default async function ClientesPage({
                 <th className="px-4 py-3 font-medium text-slate-600">Nome</th>
                 <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell">Contato</th>
                 {canVerCpf && <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">CPF</th>}
-                {canGerenciar && <th className="px-4 py-3" />}
+                {(canEditar || canExcluir) && <th className="px-4 py-3" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -104,17 +106,19 @@ export default async function ClientesPage({
                   {canVerCpf && (
                     <td className="px-4 py-3 hidden sm:table-cell text-slate-500 font-mono text-xs">{c.cpf ?? "—"}</td>
                   )}
-                  {canGerenciar && (
+                  {(canEditar || canExcluir) && (
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-3">
-                        <Link
-                          href={`/clientes/${c.id}/editar`}
-                          aria-label="Editar cliente"
-                          className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded"
-                        >
-                          <Pencil size={15} />
-                        </Link>
-                        <DeleteCustomerButton id={c.id} name={c.name} />
+                        {canEditar && (
+                          <Link
+                            href={`/clientes/${c.id}/editar`}
+                            aria-label="Editar cliente"
+                            className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded"
+                          >
+                            <Pencil size={15} />
+                          </Link>
+                        )}
+                        {canExcluir && <DeleteCustomerButton id={c.id} name={c.name} />}
                       </div>
                     </td>
                   )}

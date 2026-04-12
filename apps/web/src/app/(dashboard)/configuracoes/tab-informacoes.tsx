@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import { useFormState, useFormStatus } from "react-dom";
+import { useRouter } from "next/navigation";
 import { updateInformacoesAction } from "./actions";
 import {
   MODULES,
@@ -26,6 +28,11 @@ function SubmitButton() {
 
 export function TabInformacoes({ settings }: { settings: Record<string, unknown> }) {
   const [state, formAction] = useFormState(updateInformacoesAction, {});
+  const router = useRouter();
+
+  useEffect(() => {
+    if (state.success) router.refresh();
+  }, [state]);
 
   const threshold =
     typeof settings.low_stock_threshold === "number" ? settings.low_stock_threshold : 5;
@@ -121,7 +128,7 @@ export function TabInformacoes({ settings }: { settings: Record<string, unknown>
                 {/* Perfis configuráveis */}
                 {CONFIGURABLE_ROLES.map((role) => {
                   const allowed: string[] =
-                    savedPerms[role] && savedPerms[role].length > 0
+                    role in savedPerms && Array.isArray(savedPerms[role])
                       ? savedPerms[role]
                       : DEFAULT_PERMISSIONS[role];
 

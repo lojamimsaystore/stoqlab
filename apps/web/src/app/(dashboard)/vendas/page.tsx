@@ -28,12 +28,19 @@ export default async function VendasPage({
   const perms = await getUserActionPerms(role, tenantId);
   const canNovaVenda = perms.has("venda.criar");
 
+  // Vendedores veem apenas as próprias vendas; gerentes e proprietários veem tudo
+  const isSeller = role === "seller";
+
   let query = supabaseAdmin
     .from("sales")
     .select("id, status, payment_method, channel, total_value, discount_value, gross_margin, sold_at, notes, customers(name), locations(name)")
     .eq("tenant_id", tenantId)
     .is("deleted_at", null)
     .order("sold_at", { ascending: false });
+
+  if (isSeller && user) {
+    query = query.eq("sold_by", user.id);
+  }
 
   if (status && status !== "all") {
     query = query.eq("status", status);

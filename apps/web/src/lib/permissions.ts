@@ -31,7 +31,7 @@ export const DEFAULT_PERMISSIONS: Record<ConfigurableRole, ModuleKey[]> = {
     "clientes", "relatorios",
   ],
   seller: [
-    "dashboard", "produtos", "vendas", "clientes",
+    "dashboard", "produtos", "vendas",
   ],
   stock_operator: [
     "dashboard", "estoque", "compras", "transferencias",
@@ -51,7 +51,7 @@ export function resolvePermissions(
   }
 
   const perms = saved?.[role];
-  if (Array.isArray(perms) && perms.length > 0) {
+  if (saved && role in saved && Array.isArray(perms)) {
     return perms as ModuleKey[];
   }
 

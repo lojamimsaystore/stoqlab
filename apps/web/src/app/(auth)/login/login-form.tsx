@@ -30,10 +30,10 @@ export function LoginForm({ next }: { next: string }) {
 
   useEffect(() => {
     if (state.success) {
-      router.push(next);
+      router.push(state.redirectTo ?? next);
       router.refresh();
     }
-  }, [state.success, router, next]);
+  }, [state.success, state.redirectTo, router, next]);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">

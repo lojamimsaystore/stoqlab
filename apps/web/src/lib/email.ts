@@ -10,6 +10,7 @@ export async function sendInviteEmail({
   inviteLink: string;
 }): Promise<{ error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
+  console.log("[email] RESEND_API_KEY presente:", !!apiKey, "| tamanho:", apiKey?.length ?? 0);
   if (!apiKey) return { error: "RESEND_API_KEY não configurado no servidor." };
 
   const resend = new Resend(apiKey);

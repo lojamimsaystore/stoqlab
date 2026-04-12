@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Package } from "lucide-react";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
 import { formatCurrency } from "@stoqlab/utils";
 import { AddVariantSection } from "./add-variant-section";
@@ -23,6 +24,13 @@ export default async function ProdutoPage({
   params: { id: string };
 }) {
   const tenantId = await getTenantId();
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabaseAdmin.from("users").select("role").eq("id", user.id).single()
+    : { data: null };
+  const isOwner = profile?.role === "owner" || profile?.role === "master";
 
   const [{ data: product }, { data: variants }] =
     await Promise.all([
@@ -122,7 +130,7 @@ export default async function ProdutoPage({
                 <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">SKU</th>
                 <th className="px-4 py-3 font-medium text-slate-600">Preço</th>
                 <th className="px-4 py-3 font-medium text-slate-600">Qtd.</th>
-                <th className="px-4 py-3"></th>
+                {isOwner && <th className="px-4 py-3"></th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -147,9 +155,11 @@ export default async function ProdutoPage({
                         {qty}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <DeleteVariantButton id={v.id} productId={params.id} label={`${v.color} ${v.size}`} />
-                    </td>
+                    {isOwner && (
+                      <td className="px-4 py-3 text-right">
+                        <DeleteVariantButton id={v.id} productId={params.id} label={`${v.color} ${v.size}`} />
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -158,8 +168,8 @@ export default async function ProdutoPage({
         )}
       </div>
 
-      {/* Adicionar variação */}
-      <AddVariantSection productId={params.id} productName={product.name} />
+      {/* Adicionar variação — só para owners */}
+      {isOwner && <AddVariantSection productId={params.id} productName={product.name} />}
     </div>
   );
 }

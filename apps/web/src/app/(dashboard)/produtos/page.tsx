@@ -90,7 +90,7 @@ export default async function ProdutosPage({
           )}
         </div>
       ) : (
-        <ProductsGrid products={products as Parameters<typeof ProductsGrid>[0]["products"]} />
+        <ProductsGrid products={products as Parameters<typeof ProductsGrid>[0]["products"]} isOwner={isOwner} />
       )}
     </div>
   );

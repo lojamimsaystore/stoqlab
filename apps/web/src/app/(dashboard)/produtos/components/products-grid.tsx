@@ -47,7 +47,7 @@ type Product = {
   product_variants: { id: string; color: string; color_hex: string | null; inventory: { quantity: number }[] }[];
 };
 
-export function ProductsGrid({ products: serverProducts }: { products: Product[] }) {
+export function ProductsGrid({ products: serverProducts, isOwner = false }: { products: Product[]; isOwner?: boolean }) {
   const router = useRouter();
   // Cópia local para atualizações otimistas (cor/nome mudam imediatamente sem esperar router.refresh)
   const [products, setProducts] = useState<Product[]>(serverProducts);
@@ -107,7 +107,7 @@ export function ProductsGrid({ products: serverProducts }: { products: Product[]
   return (
     <div className="relative">
       {/* Barra de seleção — aparece quando há itens selecionados */}
-      {hasSelection && (
+      {isOwner && hasSelection && (
         <div className="sticky top-0 z-20 mb-3 flex items-center gap-3 bg-blue-600 text-white px-4 py-2.5 rounded-xl shadow-lg">
           <button
             type="button"
@@ -161,7 +161,7 @@ export function ProductsGrid({ products: serverProducts }: { products: Product[]
       )}
 
       {/* Botão selecionar todos (quando nada selecionado) */}
-      {!hasSelection && products.length > 1 && (
+      {isOwner && !hasSelection && products.length > 1 && (
         <div className="flex justify-end mb-2">
           <button
             type="button"
@@ -195,22 +195,24 @@ export function ProductsGrid({ products: serverProducts }: { products: Product[]
                   : "border-slate-200 hover:border-slate-300"
               }`}
             >
-              {/* Checkbox de seleção */}
-              <button
-                type="button"
-                onClick={() => toggleSelect(p.id)}
-                className={`absolute top-2 left-2 z-10 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                  isSelected
-                    ? "bg-blue-600 border-blue-600 opacity-100"
-                    : "bg-white/90 border-slate-300 opacity-0 group-hover:opacity-100"
-                }`}
-                title={isSelected ? "Desmarcar" : "Selecionar"}
-              >
-                {isSelected && <Check size={11} className="text-white" strokeWidth={3} />}
-              </button>
+              {/* Checkbox de seleção — só para owners */}
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={() => toggleSelect(p.id)}
+                  className={`absolute top-2 left-2 z-10 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                    isSelected
+                      ? "bg-blue-600 border-blue-600 opacity-100"
+                      : "bg-white/90 border-slate-300 opacity-0 group-hover:opacity-100"
+                  }`}
+                  title={isSelected ? "Desmarcar" : "Selecionar"}
+                >
+                  {isSelected && <Check size={11} className="text-white" strokeWidth={3} />}
+                </button>
+              )}
 
-              {/* Ações no hover (só quando não há seleção ativa) */}
-              {!hasSelection && (
+              {/* Ações no hover — só para owners */}
+              {isOwner && !hasSelection && (
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-sm flex items-center">
                     <button
@@ -232,7 +234,7 @@ export function ProductsGrid({ products: serverProducts }: { products: Product[]
                 href={`/produtos/${p.id}/variacoes`}
                 className="flex-1 flex flex-col"
                 onClick={(e) => {
-                  if (isSelected || hasSelection) {
+                  if (isOwner && (isSelected || hasSelection)) {
                     e.preventDefault();
                     toggleSelect(p.id);
                   }

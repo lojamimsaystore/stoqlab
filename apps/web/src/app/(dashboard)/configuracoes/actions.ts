@@ -250,35 +250,32 @@ export async function inviteUserAction(
   const tenantId = await getTenantId();
   const email = (formData.get("email") as string)?.trim();
   const name = (formData.get("name") as string)?.trim();
+  const password = (formData.get("password") as string);
   const role = formData.get("role") as string;
 
   if (!email || !name) return { error: "Nome e e-mail obrigatórios." };
+  if (!password || password.length < 6) return { error: "Senha deve ter ao menos 6 caracteres." };
   if (!VALID_ROLES.includes(role as typeof VALID_ROLES[number])) return { error: "Perfil inválido." };
 
-  const appUrl = await buildAppUrl();
-
-  // Envia convite — Supabase dispara o e-mail automaticamente
-  const { data: inviteData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+  // Cria o usuário com senha definida e e-mail já confirmado
+  const { data: created, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
-    { redirectTo: `${appUrl}/auth/callback?next=/convite` }
-  );
+    password,
+    email_confirm: true,
+  });
 
   if (authError) {
     if (authError.message.toLowerCase().includes("already")) return { error: "Este e-mail já está cadastrado." };
-    return { error: "Erro ao enviar convite." };
+    return { error: "Erro ao criar usuário." };
   }
 
-  // Garante registro na tabela users
-  const { data: dbUser } = await supabaseAdmin.from("users").select("id").eq("id", inviteData.user.id).single();
-  if (!dbUser) {
-    await supabaseAdmin.from("users").insert({
-      id: inviteData.user.id,
-      tenant_id: tenantId,
-      name,
-      role,
-      is_active: true,
-    });
-  }
+  await supabaseAdmin.from("users").insert({
+    id: created.user.id,
+    tenant_id: tenantId,
+    name,
+    role,
+    is_active: true,
+  });
 
   revalidatePath("/configuracoes");
   return { success: true };

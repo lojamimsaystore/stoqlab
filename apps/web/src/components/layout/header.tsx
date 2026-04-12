@@ -39,6 +39,7 @@ type HeaderProps = {
   userRole: string;
   lowStockItems?: LowStockItem[];
   lowStockThreshold?: number;
+  showNotifications?: boolean;
 };
 
 function getInitials(name: string): string {
@@ -67,7 +68,7 @@ function persistSeenIds(ids: Set<string>) {
   } catch {}
 }
 
-export function Header({ onMenuClick, userName, userEmail, userRole, lowStockItems = [], lowStockThreshold = 5 }: HeaderProps) {
+export function Header({ onMenuClick, userName, userEmail, userRole, lowStockItems = [], lowStockThreshold = 5, showNotifications = true }: HeaderProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const router = useRouter();
@@ -125,7 +126,7 @@ export function Header({ onMenuClick, userName, userEmail, userRole, lowStockIte
         </button>
 
         {/* Notificações */}
-        <DropdownMenu onOpenChange={handleNotifOpenChange}>
+        {showNotifications && <DropdownMenu onOpenChange={handleNotifOpenChange}>
           <DropdownMenuTrigger asChild>
             <button
               aria-label="Notificações"
@@ -192,7 +193,7 @@ export function Header({ onMenuClick, userName, userEmail, userRole, lowStockIte
               </>
             )}
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu>}
 
         {/* Separador */}
         <div className="w-px h-5 bg-slate-200 mx-1" />

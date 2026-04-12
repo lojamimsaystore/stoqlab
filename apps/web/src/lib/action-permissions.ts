@@ -40,6 +40,8 @@ export const ACTION_KEYS = [
   "devedor.adicionar_pagamento",
   "devedor.aumentar_divida",
   "devedor.excluir",
+  // Notificações
+  "notificacoes.sino",
   // Informações financeiras
   "info.preco_venda",
   "info.custo_compra",
@@ -141,6 +143,13 @@ export const ACTION_GROUPS: {
     ],
   },
   {
+    label: "Notificações",
+    type: "action",
+    items: [
+      { key: "notificacoes.sino", label: "Sino de alertas (estoque baixo)" },
+    ],
+  },
+  {
     label: "Informações financeiras",
     type: "info",
     items: [
@@ -178,6 +187,7 @@ export const DEFAULT_ACTION_PERMISSIONS: Record<"manager" | "seller" | "stock_op
     "transferencia.criar",
     "fornecedor.gerenciar", "cliente.criar", "cliente.editar", "cliente.excluir", "cliente.menu",
     "devedor.adicionar_pagamento", "devedor.aumentar_divida",
+    "notificacoes.sino",
     "info.preco_venda", "info.custo_compra", "info.custo_real", "info.custos_extras",
     "info.total_compra", "info.margem", "info.desconto", "info.faturamento",
     "info.resultado", "info.ranking_produtos", "info.saldo_devedor",
@@ -193,6 +203,7 @@ export const DEFAULT_ACTION_PERMISSIONS: Record<"manager" | "seller" | "stock_op
     "compra.criar", "compra.alterar_status", "compra.upload_nf",
     "estoque.ajustar",
     "transferencia.criar",
+    "notificacoes.sino",
     "info.preco_venda", "info.custo_compra", "info.total_compra",
   ],
 };

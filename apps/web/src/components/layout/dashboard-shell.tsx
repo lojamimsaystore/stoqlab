@@ -101,6 +101,10 @@ export function DashboardShell({
           userRole={userRole}
           lowStockItems={lowStockItems}
           lowStockThreshold={lowStockThreshold}
+          showNotifications={
+            userRole === "owner" || userRole === "master" ||
+            userActionPermissions.includes("notificacoes.sino")
+          }
         />
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 print:overflow-visible print:p-0">
           <PermissionsProvider permissions={userActionPermissions}>

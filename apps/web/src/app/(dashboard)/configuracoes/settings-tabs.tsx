@@ -22,7 +22,7 @@ export function SettingsTabs(props: {
   tenant: { id: string; name: string; plan: string; trial_ends_at: string | null; settings: Record<string, unknown> };
   user: { id: string; name: string; email: string; role: string };
   locations: { id: string; name: string; type: string }[];
-  users: { id: string; name: string; email: string; role: string; is_active: boolean }[];
+  users: { id: string; name: string; email: string; role: string; is_active: boolean; confirmed: boolean }[];
   currentUserRole: string;
 }) {
   const isOwner = props.currentUserRole === "owner";

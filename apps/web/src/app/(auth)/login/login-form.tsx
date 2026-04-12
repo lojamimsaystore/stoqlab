@@ -86,7 +86,6 @@ export function LoginForm({ next }: { next: string }) {
               className="w-full px-3 py-2.5 pr-10 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all placeholder:text-slate-400"
               placeholder="••••••••"
               onKeyUp={(e) => setCapsLock(e.getModifierState("CapsLock"))}
-              onFocus={(e) => setCapsLock(e.nativeEvent.getModifierState("CapsLock"))}
               onBlur={() => setCapsLock(false)}
             />
             <button

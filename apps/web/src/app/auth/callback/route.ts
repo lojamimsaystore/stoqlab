@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Se veio de um fluxo específico (ex: convite), respeita o next
-  if (next === "/convite" || next === "/completar-cadastro") {
+  if (next === "/convite" || next === "/completar-cadastro" || next === "/nova-senha") {
     return NextResponse.redirect(`${origin}${next}`);
   }
 

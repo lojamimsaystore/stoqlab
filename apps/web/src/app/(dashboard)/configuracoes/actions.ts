@@ -233,6 +233,10 @@ export async function deleteLocationAction(id: string): Promise<{ error?: string
 const VALID_ROLES = ["owner", "manager", "seller", "stock_operator"] as const;
 
 async function buildAppUrl(): Promise<string> {
+  // Usa URL fixa de produção se configurada, senão lê dos headers (dev local)
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL;
+  }
   const headersList = await headers();
   const host = headersList.get("host") ?? "localhost:3000";
   const proto = headersList.get("x-forwarded-proto") ?? "http";

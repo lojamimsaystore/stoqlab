@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Package, Plus } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
 import { SearchInput } from "@/components/ui/search-input";
 import { ProductStatusFilter } from "./components/product-status-filter";
@@ -15,6 +16,13 @@ export default async function ProdutosPage({
 }) {
   const tenantId = await getTenantId();
   const { q, status } = await searchParams;
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabaseAdmin.from("users").select("role").eq("id", user.id).single()
+    : { data: null };
+  const isOwner = profile?.role === "owner" || profile?.role === "master";
 
   let query = supabaseAdmin
     .from("products")
@@ -47,13 +55,15 @@ export default async function ProdutosPage({
             {q ? ` encontrado${total !== 1 ? "s" : ""} para "${q}"` : ""}
           </p>
         </div>
-        <Link
-          href="/compras/nova"
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-        >
-          <Plus size={16} />
-          Nova entrada
-        </Link>
+        {isOwner && (
+          <Link
+            href="/compras/nova"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+          >
+            <Plus size={16} />
+            Nova entrada
+          </Link>
+        )}
       </div>
 
       {/* Filtros */}

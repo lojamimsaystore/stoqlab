@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useFormState, useFormStatus } from "react-dom";
 import { useRef, useState } from "react";

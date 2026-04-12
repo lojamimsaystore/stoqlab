@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { ArrowLeft, Package } from "lucide-react";
 import { notFound } from "next/navigation";

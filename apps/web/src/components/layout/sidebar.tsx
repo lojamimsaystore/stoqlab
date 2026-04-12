@@ -65,7 +65,7 @@ export function Sidebar({
   const pathname = usePathname();
   const [currentColor, setCurrentColor] = useState(sidebarColor ?? "#0f172a");
   const [currentFontColor, setCurrentFontColor] = useState(sidebarFontColor ?? "#ffffff");
-  const [isPending, startTransition] = useTransition();
+  const [_isPending, startTransition] = useTransition();
 
   function handleColorSelect(hex: string) {
     setCurrentColor(hex);

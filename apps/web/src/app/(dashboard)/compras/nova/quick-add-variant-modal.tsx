@@ -161,7 +161,7 @@ export function QuickAddVariantModal({
       setColorSizes({});
       setColorSizeLines({});
     }
-  }, [open, isEdit, editVariant]);
+  }, [open, isEdit, editVariant, existingColorNames]);
 
   if (!open) return null;
 

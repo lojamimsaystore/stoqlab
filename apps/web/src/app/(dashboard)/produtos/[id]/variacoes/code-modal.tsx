@@ -47,7 +47,7 @@ export function CodeModal({ open, onClose, type, sku, label, variantId }: Props)
         setDataUrl(canvas.toDataURL("image/png"));
       } catch {}
     }
-  }, [open, type, sku]);
+  }, [open, type, sku, variantId]);
 
   function handleDownload() {
     if (!dataUrl) return;

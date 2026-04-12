@@ -1,15 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
-import { Info, Lock, Shield } from "lucide-react";
+import { Info, Lock, Shield, ChevronDown, ChevronRight } from "lucide-react";
 import { ACTION_GROUPS, resolveActionPermissions } from "@/lib/action-permissions";
 import type { ActionKey } from "@/lib/action-permissions";
 import { saveActionPermissionsAction } from "./actions";
 
 const ROLES = [
-  { key: "manager",        label: "Gerente",            color: "text-blue-700 bg-blue-50" },
-  { key: "seller",         label: "Vendedor",           color: "text-emerald-700 bg-emerald-50" },
-  { key: "stock_operator", label: "Op. Estoque",        color: "text-amber-700 bg-amber-50" },
+  { key: "manager",        label: "Gerente",           color: "text-blue-700 bg-blue-100"   },
+  { key: "seller",         label: "Vendedor",          color: "text-emerald-700 bg-emerald-100" },
+  { key: "stock_operator", label: "Op. de Estoque",    color: "text-amber-700 bg-amber-100"  },
 ] as const;
 
 function SaveButton() {
@@ -32,6 +33,20 @@ export function TabPermissoes({
 }) {
   const [state, formAction] = useFormState(saveActionPermissionsAction, {});
 
+  // Grupos abertos por padrão
+  const [openGroups, setOpenGroups] = useState<Set<string>>(
+    () => new Set(ACTION_GROUPS.map((g) => g.label))
+  );
+
+  function toggleGroup(label: string) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  }
+
   // Resolve defaults para cada role (mesclando com o que foi salvo)
   const resolved: Record<string, Set<ActionKey>> = {};
   for (const r of ROLES) {
@@ -48,7 +63,8 @@ export function TabPermissoes({
         <div>
           <h2 className="font-semibold text-slate-900">Permissões de ações e informações</h2>
           <p className="text-sm text-slate-500 mt-0.5">
-            Controle quais botões e informações cada tipo de usuário pode ver dentro do sistema.
+            Controle quais botões e informações cada tipo de usuário pode ver.
+            Clique em um grupo para expandir ou recolher.
           </p>
         </div>
       </div>
@@ -62,70 +78,88 @@ export function TabPermissoes({
         </span>
       </div>
 
-      <form action={formAction} className="space-y-6">
-        {/* Cabeçalho da tabela */}
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          {/* Header de roles */}
-          <div className="grid grid-cols-[1fr_repeat(3,80px)] border-b border-slate-200 bg-slate-50">
-            <div className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-              Ação / Informação
-            </div>
-            {ROLES.map((r) => (
-              <div key={r.key} className="py-3 text-center">
-                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${r.color}`}>
-                  {r.label}
+      <form action={formAction} className="space-y-3">
+        {ACTION_GROUPS.map((group) => {
+          const isOpen = openGroups.has(group.label);
+
+          return (
+            <div
+              key={group.label}
+              className="bg-white rounded-xl border border-slate-200 overflow-hidden"
+            >
+              {/* Cabeçalho do grupo — clicável */}
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.label)}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 ${
+                  group.type === "info"
+                    ? "border-l-4 border-amber-400"
+                    : "border-l-4 border-blue-400"
+                }`}
+              >
+                {isOpen
+                  ? <ChevronDown size={16} className="text-slate-400 shrink-0" />
+                  : <ChevronRight size={16} className="text-slate-400 shrink-0" />
+                }
+                <span className="text-sm font-semibold text-slate-700 flex-1">
+                  {group.type === "info" ? "📊 " : "🔧 "}
+                  {group.label}
                 </span>
-              </div>
-            ))}
-          </div>
+                <span className="text-xs text-slate-400">
+                  {group.items.length} {group.items.length === 1 ? "item" : "itens"}
+                </span>
+              </button>
 
-          {/* Grupos */}
-          {ACTION_GROUPS.map((group) => (
-            <div key={group.label}>
-              {/* Título do grupo */}
-              <div className={`px-4 py-2 text-xs font-bold uppercase tracking-wide border-b border-slate-100 ${
-                group.type === "info"
-                  ? "bg-amber-50 text-amber-700"
-                  : "bg-slate-50 text-slate-500"
-              }`}>
-                {group.type === "info" ? "📊 " : "🔧 "}{group.label}
-              </div>
-
-              {/* Itens */}
-              {group.items.map((item, idx) => (
-                <div
-                  key={item.key}
-                  className={`grid grid-cols-[1fr_repeat(3,80px)] border-b border-slate-100 last:border-0 ${
-                    idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
-                  }`}
-                >
-                  <div className="px-4 py-3 text-sm text-slate-700">
-                    {item.label}
+              {/* Itens — visíveis apenas quando aberto */}
+              {isOpen && (
+                <div className="border-t border-slate-100">
+                  {/* Header de colunas */}
+                  <div className="grid grid-cols-[1fr_140px_140px_140px] bg-slate-50 border-b border-slate-100">
+                    <div className="px-4 py-2 text-xs font-medium text-slate-400">
+                      Ação / Informação
+                    </div>
+                    {ROLES.map((r) => (
+                      <div key={r.key} className="py-2 flex items-center justify-center">
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${r.color}`}>
+                          {r.label}
+                        </span>
+                      </div>
+                    ))}
                   </div>
 
-                  {/* Owner — sempre bloqueado/habilitado */}
-                  {/* (não renderizado — owner não aparece na matriz) */}
-
-                  {ROLES.map((r) => {
-                    const isChecked = resolved[r.key]?.has(item.key) ?? false;
-                    const inputName = `ap_${r.key}_${item.key}`;
-                    return (
-                      <div key={r.key} className="flex items-center justify-center py-3">
-                        <input
-                          type="checkbox"
-                          name={inputName}
-                          value="1"
-                          defaultChecked={isChecked}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600 cursor-pointer"
-                        />
+                  {/* Linhas de itens */}
+                  {group.items.map((item, idx) => (
+                    <div
+                      key={item.key}
+                      className={`grid grid-cols-[1fr_140px_140px_140px] border-b border-slate-100 last:border-0 ${
+                        idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                      }`}
+                    >
+                      <div className="px-4 py-3 text-sm text-slate-700">
+                        {item.label}
                       </div>
-                    );
-                  })}
+
+                      {ROLES.map((r) => {
+                        const isChecked = resolved[r.key]?.has(item.key) ?? false;
+                        return (
+                          <div key={r.key} className="flex items-center justify-center py-3">
+                            <input
+                              type="checkbox"
+                              name={`ap_${r.key}_${item.key}`}
+                              value="1"
+                              defaultChecked={isChecked}
+                              className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600 cursor-pointer"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          ))}
-        </div>
+          );
+        })}
 
         {/* Feedback */}
         {state.error && (
@@ -140,10 +174,10 @@ export function TabPermissoes({
         )}
 
         {/* Ações */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <Lock size={12} />
-            Salvo em tempo real — afeta todos os usuários imediatamente
+            Afeta todos os usuários do tipo imediatamente após salvar
           </div>
           <SaveButton />
         </div>

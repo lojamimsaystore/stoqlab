@@ -30,7 +30,9 @@ export function LoginForm({ next }: { next: string }) {
 
   useEffect(() => {
     if (state.success) {
-      router.push(state.redirectTo ?? next);
+      // Se veio de uma página específica (ex: QR code), respeita o destino original
+      const destination = (next && next !== "/") ? next : (state.redirectTo ?? "/");
+      router.push(destination);
       router.refresh();
     }
   }, [state.success, state.redirectTo, router, next]);

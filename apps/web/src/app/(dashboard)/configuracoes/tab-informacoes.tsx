@@ -32,7 +32,7 @@ export function TabInformacoes({ settings }: { settings: Record<string, unknown>
 
   useEffect(() => {
     if (state.success) router.refresh();
-  }, [state]);
+  }, [state, router]);
 
   const threshold =
     typeof settings.low_stock_threshold === "number" ? settings.low_stock_threshold : 5;

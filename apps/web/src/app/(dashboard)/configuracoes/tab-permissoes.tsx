@@ -37,7 +37,7 @@ export function TabPermissoes({
 
   useEffect(() => {
     if (state.success) router.refresh();
-  }, [state]);
+  }, [state, router]);
 
   // Grupos abertos por padrão
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());

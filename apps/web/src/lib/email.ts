@@ -1,7 +1,5 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function sendInviteEmail({
   to,
   name,
@@ -11,8 +9,13 @@ export async function sendInviteEmail({
   name: string;
   inviteLink: string;
 }): Promise<{ error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { error: "RESEND_API_KEY não configurado no servidor." };
+
+  const resend = new Resend(apiKey);
+
   const { error } = await resend.emails.send({
-    from: "Stoqlab <noreply@stoqlab.com.br>",
+    from: "Stoqlab <onboarding@resend.dev>",
     to,
     subject: "Você foi convidado para o Stoqlab",
     html: `

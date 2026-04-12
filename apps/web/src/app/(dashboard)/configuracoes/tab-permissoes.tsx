@@ -40,9 +40,7 @@ export function TabPermissoes({
   }, [state]);
 
   // Grupos abertos por padrão
-  const [openGroups, setOpenGroups] = useState<Set<string>>(
-    () => new Set(ACTION_GROUPS.map((g) => g.label))
-  );
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
   function toggleGroup(label: string) {
     setOpenGroups((prev) => {

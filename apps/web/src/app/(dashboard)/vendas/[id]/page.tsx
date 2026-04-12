@@ -3,9 +3,11 @@ import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { getTenantId } from "@/lib/auth";
+import { getUserActionPerms } from "@/lib/server-action-permissions";
 import { formatCurrency, formatDate } from "@stoqlab/utils";
 import { Receipt } from "./receipt";
 import { AutoPrint } from "./auto-print";
+import { createClient } from "@/lib/supabase/server";
 
 const PAYMENT_LABELS: Record<string, string> = {
   cash: "Dinheiro", pix: "Pix", debit: "Cartão de débito",
@@ -21,6 +23,15 @@ export default async function VendaDetailPage({
 }) {
   const { print } = await searchParams;
   const tenantId = await getTenantId();
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabaseAdmin.from("users").select("role").eq("id", user.id).single()
+    : { data: null };
+  const role = profile?.role ?? "seller";
+  const perms = await getUserActionPerms(role, tenantId);
+  const canVerMargem = perms.has("info.margem");
 
   const [{ data: sale }, { data: tenant }] = await Promise.all([
     supabaseAdmin
@@ -87,10 +98,12 @@ export default async function VendaDetailPage({
             <p className="text-xs text-slate-500">Total</p>
             <p className="font-bold text-emerald-700 mt-0.5">{formatCurrency(Number(sale.total_value))}</p>
           </div>
-          <div>
-            <p className="text-xs text-slate-500">Margem</p>
-            <p className="font-medium text-slate-900 mt-0.5">{sale.gross_margin ? `${sale.gross_margin}%` : "—"}</p>
-          </div>
+          {canVerMargem && (
+            <div>
+              <p className="text-xs text-slate-500">Margem</p>
+              <p className="font-medium text-slate-900 mt-0.5">{sale.gross_margin ? `${sale.gross_margin}%` : "—"}</p>
+            </div>
+          )}
         </div>
         {Number(sale.discount_value) > 0 && (
           <p className="mt-3 text-sm text-red-600">Desconto: {formatCurrency(Number(sale.discount_value))}</p>

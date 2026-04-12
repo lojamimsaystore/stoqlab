@@ -7,6 +7,7 @@ import { formatCurrency } from "@stoqlab/utils";
 import { toast } from "sonner";
 import { CodeModal } from "./code-modal";
 import { LabelsPrintModal, type LabelVariant } from "./labels-print-modal";
+import { usePermissions } from "@/lib/permissions-context";
 
 type Variant = {
   id: string;
@@ -53,6 +54,13 @@ function ColorGroupRows({
   onOpenCode: (type: "qr" | "barcode", sku: string, label: string, variantId: string) => void;
   onDelete: (id: string, label: string) => void;
 }) {
+  const { can } = usePermissions();
+  const canVerCusto      = can("info.custo_compra");
+  const canVerMargem     = can("info.margem");
+  const canVerLucro      = can("info.resultado");
+  const canEditarPreco   = can("produto.editar");
+  const canExcluirVar    = can("produto.excluir_variacao");
+
   const costs = group.variants.map((v) => costMap[v.id]).filter((c) => c !== undefined);
   const avgCost = costs.length > 0 ? costs.reduce((a, b) => a + b, 0) / costs.length : null;
 
@@ -141,27 +149,35 @@ function ColorGroupRows({
             <td className="px-4 py-2.5 text-xs font-mono text-slate-400">{v.sku}</td>
 
             {/* Custo unitário */}
-            <td className="px-4 py-2.5 text-xs text-slate-600">
-              {avgCost !== null ? formatCurrency(avgCost) : <span className="text-slate-300">—</span>}
-            </td>
+            {canVerCusto && (
+              <td className="px-4 py-2.5 text-xs text-slate-600">
+                {avgCost !== null ? formatCurrency(avgCost) : <span className="text-slate-300">—</span>}
+              </td>
+            )}
 
             {/* Valor de venda */}
             <td className="px-4 py-2.5">
               {i === 0 ? (
-                <div className="flex items-center gap-0.5">
-                  <span className="text-xs text-slate-400">R$</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={salePrice}
-                    onChange={(e) => handlePriceChange(e.target.value)}
-                    placeholder="0,00"
-                    className={`w-20 text-xs font-semibold text-slate-700 bg-white border rounded px-1.5 py-0.5 outline-none focus:border-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors ${
-                      isDirty ? "border-amber-400 bg-amber-50" : "border-slate-200"
-                    }`}
-                  />
-                </div>
+                canEditarPreco ? (
+                  <div className="flex items-center gap-0.5">
+                    <span className="text-xs text-slate-400">R$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={salePrice}
+                      onChange={(e) => handlePriceChange(e.target.value)}
+                      placeholder="0,00"
+                      className={`w-20 text-xs font-semibold text-slate-700 bg-white border rounded px-1.5 py-0.5 outline-none focus:border-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors ${
+                        isDirty ? "border-amber-400 bg-amber-50" : "border-slate-200"
+                      }`}
+                    />
+                  </div>
+                ) : (
+                  <span className="text-xs font-semibold text-slate-700">
+                    {salePrice ? formatCurrency(salePriceNum) : "—"}
+                  </span>
+                )
               ) : (
                 <span className="text-xs text-slate-500">
                   {salePrice ? formatCurrency(salePriceNum) : "—"}
@@ -169,55 +185,61 @@ function ColorGroupRows({
               )}
             </td>
 
-            {/* Markup */}
-            <td className="px-4 py-2.5">
-              <span
-                className={`text-xs font-semibold ${
-                  margin !== null
-                    ? margin >= 0
-                      ? "text-blue-600"
-                      : "text-red-500"
-                    : "text-slate-300"
-                }`}
-              >
-                {margin !== null ? `${margin.toFixed(1)}%` : "—"}
-              </span>
-            </td>
+            {/* Margem */}
+            {canVerMargem && (
+              <td className="px-4 py-2.5">
+                <span
+                  className={`text-xs font-semibold ${
+                    margin !== null
+                      ? margin >= 0
+                        ? "text-blue-600"
+                        : "text-red-500"
+                      : "text-slate-300"
+                  }`}
+                >
+                  {margin !== null ? `${margin.toFixed(1)}%` : "—"}
+                </span>
+              </td>
+            )}
 
             {/* Lucro */}
-            <td className="px-4 py-2.5">
-              <span
-                className={`text-xs font-semibold ${
-                  profit !== null
-                    ? profit >= 0
-                      ? "text-emerald-600"
-                      : "text-red-500"
-                    : "text-slate-300"
-                }`}
-              >
-                {profit !== null ? formatCurrency(profit) : "—"}
-              </span>
-            </td>
+            {canVerLucro && (
+              <td className="px-4 py-2.5">
+                <span
+                  className={`text-xs font-semibold ${
+                    profit !== null
+                      ? profit >= 0
+                        ? "text-emerald-600"
+                        : "text-red-500"
+                      : "text-slate-300"
+                  }`}
+                >
+                  {profit !== null ? formatCurrency(profit) : "—"}
+                </span>
+              </td>
+            )}
 
             {/* Lucro total */}
-            <td className="px-4 py-2.5">
-              <span
-                className={`text-xs font-semibold ${
-                  totalProfit !== null
-                    ? totalProfit >= 0
-                      ? "text-emerald-600"
-                      : "text-red-500"
-                    : "text-slate-300"
-                }`}
-              >
-                {totalProfit !== null ? formatCurrency(totalProfit) : "—"}
-              </span>
-            </td>
+            {canVerLucro && (
+              <td className="px-4 py-2.5">
+                <span
+                  className={`text-xs font-semibold ${
+                    totalProfit !== null
+                      ? totalProfit >= 0
+                        ? "text-emerald-600"
+                        : "text-red-500"
+                      : "text-slate-300"
+                  }`}
+                >
+                  {totalProfit !== null ? formatCurrency(totalProfit) : "—"}
+                </span>
+              </td>
+            )}
 
             {/* Ações */}
             <td className="px-4 py-2.5">
               <div className="flex items-center gap-1">
-                {i === 0 && isDirty && salePriceNum > 0 && (
+                {canEditarPreco && i === 0 && isDirty && salePriceNum > 0 && (
                   <button
                     onClick={handleSave}
                     disabled={isPending}
@@ -245,13 +267,15 @@ function ColorGroupRows({
                 >
                   <Barcode size={13} />
                 </button>
-                <button
-                  onClick={() => onDelete(v.id, `${v.color} ${v.size}`)}
-                  title="Remover"
-                  className="p-1 rounded text-slate-300 hover:text-red-500 transition-colors"
-                >
-                  <Trash2 size={13} />
-                </button>
+                {canExcluirVar && (
+                  <button
+                    onClick={() => onDelete(v.id, `${v.color} ${v.size}`)}
+                    title="Remover"
+                    className="p-1 rounded text-slate-300 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )}
               </div>
             </td>
           </tr>
@@ -276,6 +300,11 @@ export function VariantColorGroups({
   productId: string;
   productName: string;
 }) {
+  const { can } = usePermissions();
+  const canVerCusto  = can("info.custo_compra");
+  const canVerMargem = can("info.margem");
+  const canVerLucro  = can("info.resultado");
+
   const [codeModal, setCodeModal] = useState<CodeModalState>({
     open: false,
     type: "qr",
@@ -413,11 +442,11 @@ export function VariantColorGroups({
               <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[7%]">Tamanho</th>
               <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[6%]">Peças</th>
               <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[13%]">SKU</th>
-              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Custo unit.</th>
+              {canVerCusto  && <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Custo unit.</th>}
               <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[12%]">Valor de venda</th>
-              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Markup</th>
-              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[9%]">Lucro</th>
-              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Lucro total</th>
+              {canVerMargem && <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Margem</th>}
+              {canVerLucro  && <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[9%]">Lucro</th>}
+              {canVerLucro  && <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[10%]">Lucro total</th>}
               <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-[8%]">Ações</th>
             </tr>
           </thead>

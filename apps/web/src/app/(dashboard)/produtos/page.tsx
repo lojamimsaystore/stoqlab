@@ -3,6 +3,7 @@ import { Package, Plus } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
+import { getUserActionPerms } from "@/lib/server-action-permissions";
 import { SearchInput } from "@/components/ui/search-input";
 import { ProductStatusFilter } from "./components/product-status-filter";
 import { ProductsGrid } from "./components/products-grid";
@@ -22,7 +23,9 @@ export default async function ProdutosPage({
   const { data: profile } = user
     ? await supabaseAdmin.from("users").select("role").eq("id", user.id).single()
     : { data: null };
-  const isOwner = profile?.role === "owner" || profile?.role === "master";
+  const role = profile?.role ?? "seller";
+  const perms = await getUserActionPerms(role, tenantId);
+  const canNovaEntrada = perms.has("produto.nova_entrada");
 
   let query = supabaseAdmin
     .from("products")
@@ -55,7 +58,7 @@ export default async function ProdutosPage({
             {q ? ` encontrado${total !== 1 ? "s" : ""} para "${q}"` : ""}
           </p>
         </div>
-        {isOwner && (
+        {canNovaEntrada && (
           <Link
             href="/compras/nova"
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
@@ -90,7 +93,7 @@ export default async function ProdutosPage({
           )}
         </div>
       ) : (
-        <ProductsGrid products={products as Parameters<typeof ProductsGrid>[0]["products"]} isOwner={isOwner} />
+        <ProductsGrid products={products as unknown as Parameters<typeof ProductsGrid>[0]["products"]} />
       )}
     </div>
   );

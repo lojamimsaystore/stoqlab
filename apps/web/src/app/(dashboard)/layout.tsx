@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { resolvePermissions } from "@/lib/permissions";
+import { resolveActionPermissions } from "@/lib/action-permissions";
 
 export default async function DashboardLayout({
   children,
@@ -43,6 +44,7 @@ export default async function DashboardLayout({
   let lowStockItems: LowStockItem[] = [];
   let lowStockThreshold = 5;
   let userPermissions: string[] = resolvePermissions(userRole, null);
+  let userActionPermissions: string[] = Array.from(resolveActionPermissions(userRole, null));
   let sidebarColor: string | undefined;
   let sidebarFontColor: string | undefined;
 
@@ -61,6 +63,9 @@ export default async function DashboardLayout({
 
     const savedRolePerms = settings.role_permissions as Record<string, string[]> | undefined;
     userPermissions = resolvePermissions(userRole, savedRolePerms);
+
+    const savedActionPerms = settings.action_permissions as Record<string, string[]> | undefined;
+    userActionPermissions = Array.from(resolveActionPermissions(userRole, savedActionPerms as Record<string, import("@/lib/action-permissions").ActionKey[]> | undefined));
     // Configurações é exclusivo do proprietário
     if (userRole !== "owner" && userRole !== "master") {
       userPermissions = userPermissions.filter((p) => p !== "configuracoes");
@@ -102,6 +107,7 @@ export default async function DashboardLayout({
       lowStockItems={lowStockItems}
       lowStockThreshold={lowStockThreshold}
       userPermissions={userPermissions}
+      userActionPermissions={userActionPermissions}
       sidebarColor={sidebarColor}
       sidebarFontColor={sidebarFontColor}
     >

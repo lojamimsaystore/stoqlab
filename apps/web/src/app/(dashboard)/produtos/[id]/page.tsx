@@ -3,6 +3,7 @@ import { ArrowLeft, Package } from "lucide-react";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
+import { getUserActionPerms } from "@/lib/server-action-permissions";
 import { getTenantId } from "@/lib/auth";
 import { formatCurrency } from "@stoqlab/utils";
 import { AddVariantSection } from "./add-variant-section";
@@ -30,7 +31,11 @@ export default async function ProdutoPage({
   const { data: profile } = user
     ? await supabaseAdmin.from("users").select("role").eq("id", user.id).single()
     : { data: null };
-  const isOwner = profile?.role === "owner" || profile?.role === "master";
+  const role = profile?.role ?? "seller";
+  const perms = await getUserActionPerms(role, tenantId);
+  const canAdicionarVariacao = perms.has("produto.adicionar_variacao");
+  const canExcluirVariacao   = perms.has("produto.excluir_variacao");
+  const canVerPreco          = perms.has("info.preco_venda");
 
   const [{ data: product }, { data: variants }] =
     await Promise.all([
@@ -128,9 +133,9 @@ export default async function ProdutoPage({
               <tr className="border-b border-slate-100 bg-slate-50 text-left">
                 <th className="px-4 py-3 font-medium text-slate-600">Cor / Tamanho</th>
                 <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">SKU</th>
-                <th className="px-4 py-3 font-medium text-slate-600">Preço</th>
+                {canVerPreco && <th className="px-4 py-3 font-medium text-slate-600">Preço</th>}
                 <th className="px-4 py-3 font-medium text-slate-600">Qtd.</th>
-                {isOwner && <th className="px-4 py-3"></th>}
+                {canExcluirVariacao && <th className="px-4 py-3"></th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -147,15 +152,17 @@ export default async function ProdutoPage({
                     <td className="px-4 py-3 hidden sm:table-cell text-slate-500 font-mono text-xs">
                       {v.sku}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {v.sale_price ? formatCurrency(Number(v.sale_price)) : "—"}
-                    </td>
+                    {canVerPreco && (
+                      <td className="px-4 py-3 text-slate-700">
+                        {v.sale_price ? formatCurrency(Number(v.sale_price)) : "—"}
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <span className={`font-semibold ${qty === 0 ? "text-red-500" : "text-slate-900"}`}>
                         {qty}
                       </span>
                     </td>
-                    {isOwner && (
+                    {canExcluirVariacao && (
                       <td className="px-4 py-3 text-right">
                         <DeleteVariantButton id={v.id} productId={params.id} label={`${v.color} ${v.size}`} />
                       </td>
@@ -168,8 +175,7 @@ export default async function ProdutoPage({
         )}
       </div>
 
-      {/* Adicionar variação — só para owners */}
-      {isOwner && <AddVariantSection productId={params.id} productName={product.name} />}
+      {canAdicionarVariacao && <AddVariantSection productId={params.id} productName={product.name} />}
     </div>
   );
 }

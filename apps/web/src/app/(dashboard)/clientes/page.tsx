@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Plus, Users, Pencil, Phone, Mail } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
+import { getUserActionPerms } from "@/lib/server-action-permissions";
 import { DeleteCustomerButton } from "./delete-customer-button";
 import { SearchInput } from "@/components/ui/search-input";
 import { Suspense } from "react";
@@ -13,6 +15,16 @@ export default async function ClientesPage({
 }) {
   const tenantId = await getTenantId();
   const { q } = await searchParams;
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabaseAdmin.from("users").select("role").eq("id", user.id).single()
+    : { data: null };
+  const role = profile?.role ?? "seller";
+  const perms = await getUserActionPerms(role, tenantId);
+  const canGerenciar = perms.has("cliente.gerenciar");
+  const canVerCpf    = perms.has("info.cpf_cliente");
 
   let query = supabaseAdmin
     .from("customers")
@@ -37,13 +49,15 @@ export default async function ClientesPage({
             {q ? ` encontrado${(customers?.length ?? 0) !== 1 ? "s" : ""} para "${q}"` : " cadastrado" + ((customers?.length ?? 0) !== 1 ? "s" : "")}
           </p>
         </div>
-        <Link
-          href="/clientes/novo"
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-        >
-          <Plus size={16} />
-          Novo cliente
-        </Link>
+        {canGerenciar && (
+          <Link
+            href="/clientes/novo"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+          >
+            <Plus size={16} />
+            Novo cliente
+          </Link>
+        )}
       </div>
 
       {/* Busca */}
@@ -70,8 +84,8 @@ export default async function ClientesPage({
               <tr className="bg-slate-50 text-left border-b border-slate-100">
                 <th className="px-4 py-3 font-medium text-slate-600">Nome</th>
                 <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell">Contato</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">CPF</th>
-                <th className="px-4 py-3" />
+                {canVerCpf && <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">CPF</th>}
+                {canGerenciar && <th className="px-4 py-3" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -87,19 +101,23 @@ export default async function ClientesPage({
                       {c.email && <div className="flex items-center gap-1.5 text-slate-500"><Mail size={12} />{c.email}</div>}
                     </div>
                   </td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-slate-500 font-mono text-xs">{c.cpf ?? "—"}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-3">
-                      <Link
-                        href={`/clientes/${c.id}/editar`}
-                        aria-label="Editar cliente"
-                        className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded"
-                      >
-                        <Pencil size={15} />
-                      </Link>
-                      <DeleteCustomerButton id={c.id} name={c.name} />
-                    </div>
-                  </td>
+                  {canVerCpf && (
+                    <td className="px-4 py-3 hidden sm:table-cell text-slate-500 font-mono text-xs">{c.cpf ?? "—"}</td>
+                  )}
+                  {canGerenciar && (
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-3">
+                        <Link
+                          href={`/clientes/${c.id}/editar`}
+                          aria-label="Editar cliente"
+                          className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded"
+                        >
+                          <Pencil size={15} />
+                        </Link>
+                        <DeleteCustomerButton id={c.id} name={c.name} />
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

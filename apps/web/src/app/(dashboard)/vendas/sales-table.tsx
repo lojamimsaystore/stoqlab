@@ -9,6 +9,7 @@ import { formatCurrency, formatDate } from "@stoqlab/utils";
 import { bulkCancelSalesAction } from "./actions";
 import { CancelSaleButton } from "./cancel-sale-button";
 import { PrintReceiptButton } from "./print-receipt-button";
+import { usePermissions } from "@/lib/permissions-context";
 
 const PAYMENT_LABELS: Record<string, string> = {
   cash: "Dinheiro",
@@ -54,6 +55,13 @@ type Sale = {
 };
 
 export function SalesTable({ sales }: { sales: Sale[] }) {
+  const { can } = usePermissions();
+  const canCancelar  = can("venda.cancelar");
+  const canEditar    = can("venda.editar");
+  const canImprimir  = can("venda.imprimir");
+  const canVerMargem = can("info.margem");
+  const canVerDesconto = can("info.desconto");
+
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
@@ -104,7 +112,7 @@ export function SalesTable({ sales }: { sales: Sale[] }) {
   return (
     <div className="space-y-2">
       {/* Barra de seleção */}
-      {hasSelection && (
+      {canCancelar && hasSelection && (
         <div className="flex items-center gap-3 bg-blue-600 text-white px-4 py-2.5 rounded-xl shadow-lg">
           <button type="button" onClick={clearSelection} className="p-1 rounded hover:bg-blue-500 transition" title="Limpar seleção">
             <X size={15} />
@@ -153,23 +161,25 @@ export function SalesTable({ sales }: { sales: Sale[] }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 text-left border-b border-slate-100">
-                <th className="px-4 py-3 w-8">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={toggleAll}
-                    className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600"
-                    title={allSelected ? "Desmarcar todas" : "Selecionar todas"}
-                  />
-                </th>
+                {canCancelar && (
+                  <th className="px-4 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600"
+                      title={allSelected ? "Desmarcar todas" : "Selecionar todas"}
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3 font-medium text-slate-600">Data</th>
                 <th className="px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">Cliente</th>
                 <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell">Pagamento</th>
                 <th className="px-4 py-3 font-medium text-slate-600 hidden xl:table-cell">Parcelas</th>
                 <th className="px-4 py-3 font-medium text-slate-600 hidden lg:table-cell">Local</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden lg:table-cell">Desconto</th>
+                {canVerDesconto && <th className="px-4 py-3 font-medium text-slate-600 hidden lg:table-cell">Desconto</th>}
                 <th className="px-4 py-3 font-medium text-slate-600 text-right">Total</th>
-                <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell text-right">Margem</th>
+                {canVerMargem && <th className="px-4 py-3 font-medium text-slate-600 hidden md:table-cell text-right">Margem</th>}
                 <th className="px-4 py-3 font-medium text-slate-600">Status</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -183,14 +193,16 @@ export function SalesTable({ sales }: { sales: Sale[] }) {
 
                 return (
                   <tr key={s.id} className={`transition-colors ${isSelected ? "bg-blue-50" : "hover:bg-slate-50"}`}>
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelect(s.id)}
-                        className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600"
-                      />
-                    </td>
+                    {canCancelar && (
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(s.id)}
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-slate-700">{formatDate(s.sold_at)}</td>
                     <td className="px-4 py-3 hidden sm:table-cell text-slate-700">
                       {customer?.name ?? <span className="text-slate-400">—</span>}
@@ -204,15 +216,19 @@ export function SalesTable({ sales }: { sales: Sale[] }) {
                     <td className="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs">
                       {location?.name ?? <span className="text-slate-300">—</span>}
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-slate-500">
-                      {Number(s.discount_value) > 0 ? formatCurrency(Number(s.discount_value)) : "—"}
-                    </td>
+                    {canVerDesconto && (
+                      <td className="px-4 py-3 hidden lg:table-cell text-slate-500">
+                        {Number(s.discount_value) > 0 ? formatCurrency(Number(s.discount_value)) : "—"}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-right font-semibold text-slate-900">
                       {formatCurrency(Number(s.total_value))}
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell text-right text-emerald-600 font-medium">
-                      {s.gross_margin ? `${Number(s.gross_margin).toFixed(1)}%` : "—"}
-                    </td>
+                    {canVerMargem && (
+                      <td className="px-4 py-3 hidden md:table-cell text-right text-emerald-600 font-medium">
+                        {s.gross_margin ? `${Number(s.gross_margin).toFixed(1)}%` : "—"}
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLOR[s.status] ?? ""}`}>
                         {STATUS_LABEL[s.status]}
@@ -220,18 +236,18 @@ export function SalesTable({ sales }: { sales: Sale[] }) {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <PrintReceiptButton id={s.id} />
+                        {canImprimir && <PrintReceiptButton id={s.id} />}
                         <Link href={`/vendas/${s.id}`} title="Ver venda" aria-label="Ver detalhes da venda"
                           className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded inline-flex">
                           <Eye size={15} />
                         </Link>
-                        {!hasSelection && s.status === "completed" && (
+                        {canEditar && !hasSelection && s.status === "completed" && (
                           <Link href={`/vendas/${s.id}/editar`} title="Editar venda" aria-label="Editar venda"
                             className="text-slate-400 hover:text-amber-600 transition-colors p-1 rounded inline-flex">
                             <Pencil size={15} />
                           </Link>
                         )}
-                        {!hasSelection && s.status === "completed" && <CancelSaleButton id={s.id} />}
+                        {canCancelar && !hasSelection && s.status === "completed" && <CancelSaleButton id={s.id} />}
                       </div>
                     </td>
                   </tr>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Pencil, Search } from "lucide-react";
 import { AdjustModal } from "./adjust-modal";
+import { usePermissions } from "@/lib/permissions-context";
 
 type InventoryRow = {
   id: string;
@@ -19,6 +20,9 @@ type InventoryRow = {
 };
 
 export function EstoqueTable({ rows, lowStockThreshold = 5 }: { rows: InventoryRow[]; lowStockThreshold?: number }) {
+  const { can } = usePermissions();
+  const canAjustar = can("estoque.ajustar");
+
   const [search, setSearch] = useState("");
   const [filterLow, setFilterLow] = useState(false);
   const [filterLocation, setFilterLocation] = useState("");
@@ -152,15 +156,17 @@ export function EstoqueTable({ rows, lowStockThreshold = 5 }: { rows: InventoryR
                         {row.quantity}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => setAdjusting(row)}
-                        className="text-slate-400 hover:text-blue-600 transition-colors"
-                        title="Ajustar estoque"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                    </td>
+                    {canAjustar && (
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => setAdjusting(row)}
+                          className="text-slate-400 hover:text-blue-600 transition-colors"
+                          title="Ajustar estoque"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

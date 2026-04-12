@@ -33,6 +33,9 @@ export default async function ConfiguracoesPage() {
     confirmed: authUserMap[u.id]?.confirmed ?? true,
   }));
 
+  const settings = (tenant?.settings as Record<string, unknown>) ?? {};
+  const savedActionPermissions = (settings.action_permissions as Record<string, import("@/lib/action-permissions").ActionKey[]> | undefined);
+
   return (
     <div className="space-y-6">
       <div>
@@ -40,11 +43,12 @@ export default async function ConfiguracoesPage() {
         <p className="text-sm text-slate-500 mt-1">Gerencie sua loja, conta e equipe.</p>
       </div>
       <SettingsTabs
-        tenant={{ ...tenant!, settings: (tenant?.settings as Record<string, unknown>) ?? {} }}
+        tenant={{ ...tenant!, settings }}
         user={{ id: authUser.id, name: userProfile?.name ?? "", email: authUser.email ?? "", role: userProfile?.role ?? "seller" }}
         locations={locations ?? []}
         users={usersWithEmail}
         currentUserRole={userProfile?.role ?? "seller"}
+        savedActionPermissions={savedActionPermissions}
       />
     </div>
   );

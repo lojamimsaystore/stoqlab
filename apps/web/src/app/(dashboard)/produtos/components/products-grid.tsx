@@ -9,6 +9,7 @@ import { bulkDeleteProductsAction } from "../actions";
 import { DeleteProductButton } from "./delete-product-button";
 import { ArchiveProductButton } from "./archive-product-button";
 import { EditProductModal } from "./edit-product-modal";
+import { usePermissions } from "@/lib/permissions-context";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Ativo",
@@ -47,7 +48,12 @@ type Product = {
   product_variants: { id: string; color: string; color_hex: string | null; inventory: { quantity: number }[] }[];
 };
 
-export function ProductsGrid({ products: serverProducts, isOwner = false }: { products: Product[]; isOwner?: boolean }) {
+export function ProductsGrid({ products: serverProducts }: { products: Product[] }) {
+  const { can } = usePermissions();
+  const canEdit    = can("produto.editar");
+  const canArchive = can("produto.arquivar");
+  const canDelete  = can("produto.excluir");
+  const canSelect  = canDelete; // seleção só faz sentido se pode excluir
   const router = useRouter();
   // Cópia local para atualizações otimistas (cor/nome mudam imediatamente sem esperar router.refresh)
   const [products, setProducts] = useState<Product[]>(serverProducts);
@@ -107,7 +113,7 @@ export function ProductsGrid({ products: serverProducts, isOwner = false }: { pr
   return (
     <div className="relative">
       {/* Barra de seleção — aparece quando há itens selecionados */}
-      {isOwner && hasSelection && (
+      {canSelect && hasSelection && (
         <div className="sticky top-0 z-20 mb-3 flex items-center gap-3 bg-blue-600 text-white px-4 py-2.5 rounded-xl shadow-lg">
           <button
             type="button"
@@ -161,7 +167,7 @@ export function ProductsGrid({ products: serverProducts, isOwner = false }: { pr
       )}
 
       {/* Botão selecionar todos (quando nada selecionado) */}
-      {isOwner && !hasSelection && products.length > 1 && (
+      {canSelect && !hasSelection && products.length > 1 && (
         <div className="flex justify-end mb-2">
           <button
             type="button"
@@ -195,8 +201,8 @@ export function ProductsGrid({ products: serverProducts, isOwner = false }: { pr
                   : "border-slate-200 hover:border-slate-300"
               }`}
             >
-              {/* Checkbox de seleção — só para owners */}
-              {isOwner && (
+              {/* Checkbox de seleção */}
+              {canSelect && (
                 <button
                   type="button"
                   onClick={() => toggleSelect(p.id)}
@@ -211,20 +217,22 @@ export function ProductsGrid({ products: serverProducts, isOwner = false }: { pr
                 </button>
               )}
 
-              {/* Ações no hover — só para owners */}
-              {isOwner && !hasSelection && (
+              {/* Ações no hover */}
+              {(canEdit || canArchive || canDelete) && !hasSelection && (
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-sm flex items-center">
-                    <button
-                      type="button"
-                      onClick={(e) => { e.preventDefault(); setEditingProduct(p); }}
-                      title="Editar nome e foto"
-                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition"
-                    >
-                      <Pencil size={13} />
-                    </button>
-                    <ArchiveProductButton id={p.id} status={p.status} />
-                    <DeleteProductButton id={p.id} name={p.name} />
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); setEditingProduct(p); }}
+                        title="Editar nome e foto"
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    )}
+                    {canArchive && <ArchiveProductButton id={p.id} status={p.status} />}
+                    {canDelete && <DeleteProductButton id={p.id} name={p.name} />}
                   </div>
                 </div>
               )}
@@ -234,7 +242,7 @@ export function ProductsGrid({ products: serverProducts, isOwner = false }: { pr
                 href={`/produtos/${p.id}/variacoes`}
                 className="flex-1 flex flex-col"
                 onClick={(e) => {
-                  if (isOwner && (isSelected || hasSelection)) {
+                  if (canSelect && (isSelected || hasSelection)) {
                     e.preventDefault();
                     toggleSelect(p.id);
                   }

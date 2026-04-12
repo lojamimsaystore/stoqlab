@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Plus, ShoppingBag } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
+import { getUserActionPerms } from "@/lib/server-action-permissions";
 import { SearchInput } from "@/components/ui/search-input";
 import { StatusFilter } from "./status-filter";
 import { DateFilter } from "./date-filter";
@@ -16,6 +18,15 @@ export default async function ComprasPage({
 }) {
   const tenantId = await getTenantId();
   const { q, status, dateFrom, dateTo } = await searchParams;
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabaseAdmin.from("users").select("role").eq("id", user.id).single()
+    : { data: null };
+  const role = profile?.role ?? "seller";
+  const perms = await getUserActionPerms(role, tenantId);
+  const canNovaCompra = perms.has("compra.criar");
 
   let query = supabaseAdmin
     .from("purchases")
@@ -101,13 +112,15 @@ export default async function ComprasPage({
             {total} compra{total !== 1 ? "s" : ""} registrada{total !== 1 ? "s" : ""}
           </p>
         </div>
-        <Link
-          href="/compras/nova"
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-        >
-          <Plus size={16} />
-          Nova compra
-        </Link>
+        {canNovaCompra && (
+          <Link
+            href="/compras/nova"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+          >
+            <Plus size={16} />
+            Nova compra
+          </Link>
+        )}
       </div>
 
       {/* Filtros */}
@@ -129,7 +142,7 @@ export default async function ComprasPage({
           <p className="text-slate-600 font-medium">
             {q || status || dateFrom || dateTo ? "Nenhuma compra encontrada com esses filtros" : "Nenhuma compra registrada"}
           </p>
-          {!q && !status && !dateFrom && !dateTo && (
+          {!q && !status && !dateFrom && !dateTo && canNovaCompra && (
             <>
               <p className="text-slate-400 text-sm mt-1">Comece registrando sua primeira entrada de mercadoria</p>
               <Link

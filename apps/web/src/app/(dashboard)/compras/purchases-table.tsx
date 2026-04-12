@@ -9,6 +9,7 @@ import { formatCurrency, formatDate } from "@stoqlab/utils";
 import { bulkDeletePurchasesAction } from "./actions";
 import { DeletePurchaseButton } from "./delete-purchase-button";
 import { PurchaseStatusSelect } from "./purchase-status-select";
+import { usePermissions } from "@/lib/permissions-context";
 
 type Purchase = {
   id: string;
@@ -27,6 +28,12 @@ type SortField = "purchased_at" | "suppliers" | "total_items" | "total";
 type SortDir = "asc" | "desc";
 
 export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
+  const { can } = usePermissions();
+  const canEditar        = can("compra.editar");
+  const canExcluir       = can("compra.excluir");
+  const canAlterarStatus = can("compra.alterar_status");
+  const canVerTotal      = can("info.total_compra");
+
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
@@ -109,7 +116,7 @@ export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
   return (
     <div className="space-y-2">
       {/* Barra de seleção */}
-      {hasSelection && (
+      {canExcluir && hasSelection && (
         <div className="flex items-center gap-3 bg-blue-600 text-white px-4 py-2.5 rounded-xl shadow-lg">
           <button type="button" onClick={clearSelection} className="p-1 rounded hover:bg-blue-500 transition" title="Limpar seleção">
             <X size={15} />
@@ -153,16 +160,18 @@ export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 text-left border-b border-slate-100">
-              <th className="px-4 py-3 w-8">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                  disabled={isPending}
-                  className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-                  title={allSelected ? "Desmarcar todas" : "Selecionar todas"}
-                />
-              </th>
+              {canExcluir && (
+                <th className="px-4 py-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    disabled={isPending}
+                    className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    title={allSelected ? "Desmarcar todas" : "Selecionar todas"}
+                  />
+                </th>
+              )}
               <th className="px-4 py-3 font-medium text-slate-600 cursor-pointer select-none" onClick={() => handleSort("purchased_at")}>
                 Data <SortIcon field="purchased_at" />
               </th>
@@ -173,9 +182,11 @@ export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
               <th className="px-4 py-3 font-medium text-slate-600 text-center cursor-pointer select-none" onClick={() => handleSort("total_items")}>
                 Peças <SortIcon field="total_items" />
               </th>
-              <th className="px-4 py-3 font-medium text-slate-600 text-right cursor-pointer select-none" onClick={() => handleSort("total")}>
-                Total <SortIcon field="total" />
-              </th>
+              {canVerTotal && (
+                <th className="px-4 py-3 font-medium text-slate-600 text-right cursor-pointer select-none" onClick={() => handleSort("total")}>
+                  Total <SortIcon field="total" />
+                </th>
+              )}
               <th className="px-4 py-3 font-medium text-slate-600">Status</th>
               <th className="px-4 py-3" />
             </tr>
@@ -191,15 +202,17 @@ export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
                   key={p.id}
                   className={`transition-colors ${isSelected ? "bg-blue-50" : "hover:bg-slate-50"}`}
                 >
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleSelect(p.id)}
-                      disabled={isPending}
-                      className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                  </td>
+                  {canExcluir && (
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(p.id)}
+                        disabled={isPending}
+                        className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-slate-700">{formatDate(p.purchased_at)}</td>
                   <td className="px-4 py-3 hidden sm:table-cell text-slate-700">
                     {supplier?.name ?? <span className="text-slate-400">—</span>}
@@ -217,9 +230,18 @@ export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-center text-slate-700">{p.total_items}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatCurrency(total)}</td>
+                  {canVerTotal && (
+                    <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatCurrency(total)}</td>
+                  )}
                   <td className="px-4 py-3">
-                    <PurchaseStatusSelect id={p.id} status={p.status} />
+                    {canAlterarStatus
+                      ? <PurchaseStatusSelect id={p.id} status={p.status} />
+                      : <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                          p.status === "received" ? "bg-emerald-100 text-emerald-700" :
+                          p.status === "pending"  ? "bg-amber-100 text-amber-700" :
+                          "bg-slate-100 text-slate-600"
+                        }`}>{p.status === "received" ? "Recebida" : p.status === "pending" ? "Pendente" : p.status}</span>
+                    }
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -227,13 +249,13 @@ export function PurchasesTable({ purchases }: { purchases: Purchase[] }) {
                         className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded">
                         <Eye size={15} />
                       </Link>
-                      {!hasSelection && (
+                      {canEditar && !hasSelection && (
                         <Link href={`/compras/${p.id}/editar`} title="Editar compra" aria-label="Editar compra"
                           className="text-slate-400 hover:text-amber-600 transition-colors p-1 rounded">
                           <Pencil size={15} />
                         </Link>
                       )}
-                      {!hasSelection && <DeletePurchaseButton id={p.id} />}
+                      {canExcluir && !hasSelection && <DeletePurchaseButton id={p.id} />}
                     </div>
                   </td>
                 </tr>

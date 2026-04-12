@@ -83,6 +83,42 @@ export async function updateInformacoesAction(
   return { success: true };
 }
 
+// ─── Permissões de ações ─────────────────────────────────────
+
+export async function saveActionPermissionsAction(
+  _prev: { error?: string; success?: boolean },
+  formData: FormData
+): Promise<{ error?: string; success?: boolean }> {
+  const tenantId = await getTenantId();
+
+  const roles = ["manager", "seller", "stock_operator"] as const;
+  const { ACTION_KEYS } = await import("@/lib/action-permissions");
+
+  const action_permissions: Record<string, string[]> = {};
+  for (const role of roles) {
+    action_permissions[role] = ACTION_KEYS.filter(
+      (k) => formData.get(`ap_${role}_${k}`) === "1"
+    );
+  }
+
+  const { data: existing } = await supabaseAdmin
+    .from("tenants")
+    .select("settings")
+    .eq("id", tenantId)
+    .single();
+  const existingSettings = (existing?.settings as Record<string, unknown>) ?? {};
+
+  const { error } = await supabaseAdmin
+    .from("tenants")
+    .update({ settings: { ...existingSettings, action_permissions } })
+    .eq("id", tenantId);
+
+  if (error) return { error: "Erro ao salvar permissões." };
+
+  revalidatePath("/", "layout");
+  return { success: true };
+}
+
 // ─── Minha conta ──────────────────────────────────────────────
 
 export async function updateProfileAction(

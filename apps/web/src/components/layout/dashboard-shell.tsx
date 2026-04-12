@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
 import { moduleFromPath, MODULES } from "@/lib/permissions";
+import { PermissionsProvider } from "@/lib/permissions-context";
 
 type LowStockItem = {
   id: string;
@@ -24,6 +25,7 @@ type DashboardShellProps = {
   lowStockItems?: LowStockItem[];
   lowStockThreshold?: number;
   userPermissions?: string[];
+  userActionPermissions?: string[];
   sidebarColor?: string;
   sidebarFontColor?: string;
 };
@@ -37,6 +39,7 @@ export function DashboardShell({
   lowStockItems = [],
   lowStockThreshold = 5,
   userPermissions = [],
+  userActionPermissions = [],
   sidebarColor,
   sidebarFontColor,
 }: DashboardShellProps) {
@@ -98,7 +101,11 @@ export function DashboardShell({
           lowStockItems={lowStockItems}
           lowStockThreshold={lowStockThreshold}
         />
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 print:overflow-visible print:p-0">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 print:overflow-visible print:p-0">
+          <PermissionsProvider permissions={userActionPermissions}>
+            {children}
+          </PermissionsProvider>
+        </main>
       </div>
     </div>
   );

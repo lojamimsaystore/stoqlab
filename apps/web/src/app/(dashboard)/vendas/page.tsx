@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Plus, ShoppingBag } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
+import { getUserActionPerms } from "@/lib/server-action-permissions";
 import { formatCurrency } from "@stoqlab/utils";
 import { SearchInput } from "@/components/ui/search-input";
 import { StatusFilter } from "./status-filter";
@@ -16,6 +18,15 @@ export default async function VendasPage({
 }) {
   const tenantId = await getTenantId();
   const { q, status } = await searchParams;
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabaseAdmin.from("users").select("role").eq("id", user.id).single()
+    : { data: null };
+  const role = profile?.role ?? "seller";
+  const perms = await getUserActionPerms(role, tenantId);
+  const canNovaVenda = perms.has("venda.criar");
 
   let query = supabaseAdmin
     .from("sales")
@@ -51,13 +62,15 @@ export default async function VendasPage({
           <h1 className="text-xl font-semibold text-slate-900">Vendas</h1>
           <p className="text-sm text-slate-500 mt-0.5">Histórico de vendas realizadas.</p>
         </div>
-        <Link
-          href="/vendas/nova"
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-        >
-          <Plus size={16} />
-          Nova venda
-        </Link>
+        {canNovaVenda && (
+          <Link
+            href="/vendas/nova"
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+          >
+            <Plus size={16} />
+            Nova venda
+          </Link>
+        )}
       </div>
 
       {/* Cards resumo */}

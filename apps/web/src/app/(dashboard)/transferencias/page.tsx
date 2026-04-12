@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Plus, ArrowLeftRight, Eye } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
+import { getUserActionPerms } from "@/lib/server-action-permissions";
 import { formatDate } from "@stoqlab/utils";
 import { AddLocationForm } from "./add-location-form";
 import { DeleteTransferButton } from "./delete-transfer-button";
@@ -18,6 +20,16 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default async function TransferenciasPage() {
   const tenantId = await getTenantId();
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabaseAdmin.from("users").select("role").eq("id", user.id).single()
+    : { data: null };
+  const role = profile?.role ?? "seller";
+  const perms = await getUserActionPerms(role, tenantId);
+  const canNovaTransferencia = perms.has("transferencia.criar");
+  const canExcluirTransferencia = perms.has("transferencia.excluir");
 
   const [{ data: transfers }, { data: locations }] = await Promise.all([
     supabaseAdmin
@@ -42,11 +54,13 @@ export default async function TransferenciasPage() {
           <h1 className="text-xl font-semibold text-slate-900">Transferências</h1>
           <p className="text-sm text-slate-500 mt-1">Movimentação de estoque entre lojas e depósitos.</p>
         </div>
-        <Link href="/transferencias/nova"
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
-          <Plus size={16} />
-          Nova transferência
-        </Link>
+        {canNovaTransferencia && (
+          <Link href="/transferencias/nova"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            <Plus size={16} />
+            Nova transferência
+          </Link>
+        )}
       </div>
 
       {/* Localizações cadastradas */}
@@ -108,7 +122,7 @@ export default async function TransferenciasPage() {
                           className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded inline-flex">
                           <Eye size={15} />
                         </Link>
-                        <DeleteTransferButton transferId={t.id} />
+                        {canExcluirTransferencia && <DeleteTransferButton transferId={t.id} />}
                       </div>
                     </td>
                   </tr>

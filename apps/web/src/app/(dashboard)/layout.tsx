@@ -61,6 +61,10 @@ export default async function DashboardLayout({
 
     const savedRolePerms = settings.role_permissions as Record<string, string[]> | undefined;
     userPermissions = resolvePermissions(userRole, savedRolePerms);
+    // Configurações é exclusivo do proprietário
+    if (userRole !== "owner" && userRole !== "master") {
+      userPermissions = userPermissions.filter((p) => p !== "configuracoes");
+    }
     sidebarColor = typeof settings.sidebar_color === "string" ? settings.sidebar_color : undefined;
     sidebarFontColor = typeof settings.sidebar_font_color === "string" ? settings.sidebar_font_color : undefined;
 

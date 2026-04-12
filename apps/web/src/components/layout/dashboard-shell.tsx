@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
-import { moduleFromPath } from "@/lib/permissions";
+import { moduleFromPath, MODULES } from "@/lib/permissions";
 
 type LowStockItem = {
   id: string;
@@ -51,12 +51,19 @@ export function DashboardShell({
     if (stored !== null) setCollapsed(stored === "true");
   }, []);
 
-  // Route guard: redirect to dashboard if current module is not allowed
+  // Route guard: redireciona para o primeiro módulo permitido se acessar um bloqueado
   useEffect(() => {
     if (userRole === "owner" || userRole === "master") return;
     const currentModule = moduleFromPath(pathname);
     if (currentModule && !userPermissions.includes(currentModule)) {
-      router.replace("/");
+      const modulePathMap: Record<string, string> = {
+        dashboard: "/", produtos: "/produtos", categorias: "/categorias",
+        estoque: "/estoque", compras: "/compras", vendas: "/vendas",
+        transferencias: "/transferencias", fornecedores: "/fornecedores",
+        clientes: "/clientes", relatorios: "/relatorios", configuracoes: "/configuracoes",
+      };
+      const firstAllowed = MODULES.map((m) => m.key).find((k) => userPermissions.includes(k));
+      router.replace(firstAllowed ? (modulePathMap[firstAllowed] ?? "/") : "/login");
     }
   }, [pathname, userPermissions, userRole, router]);
 

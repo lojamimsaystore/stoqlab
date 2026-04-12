@@ -73,14 +73,9 @@ export function LoginForm({ next }: { next: string }) {
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="senha" className="block text-sm font-medium text-slate-700">
-              Senha
-            </label>
-            <Link href="/esqueci-senha" className="text-xs text-blue-600 hover:underline">
-              Esqueci minha senha
-            </Link>
-          </div>
+          <label htmlFor="senha" className="block text-sm font-medium text-slate-700 mb-1.5">
+            Senha
+          </label>
           <div className="relative">
             <input
               id="senha"
@@ -121,7 +116,13 @@ export function LoginForm({ next }: { next: string }) {
         <SubmitButton />
       </form>
 
-      <p className="mt-6 text-center text-sm text-slate-500">
+      <div className="mt-3 text-right">
+        <Link href="/esqueci-senha" className="text-xs text-blue-600 hover:underline">
+          Esqueci minha senha
+        </Link>
+      </div>
+
+      <p className="mt-4 text-center text-sm text-slate-500">
         Não tem conta?{" "}
         <Link href="/registro" className="text-blue-600 font-medium hover:underline">
           Criar conta grátis

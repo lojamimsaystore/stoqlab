@@ -6,7 +6,6 @@ import { supabaseAdmin } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
-import { sendInviteEmail } from "@/lib/email";
 
 // ─── Dados da loja ────────────────────────────────────────────
 
@@ -240,21 +239,6 @@ async function buildAppUrl(): Promise<string> {
   return `${proto}://${host}`;
 }
 
-/** Gera link de convite via Supabase e envia pelo Resend. */
-async function generateAndSendInvite(email: string, name: string, appUrl: string): Promise<{ error?: string }> {
-  const { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-    type: "invite",
-    email,
-    options: { redirectTo: `${appUrl}/auth/callback?next=/convite` },
-  });
-
-  if (linkError || !data.properties?.action_link) {
-    return { error: linkError?.message ?? "Não foi possível gerar o link de convite." };
-  }
-
-  return sendInviteEmail({ to: email, name, inviteLink: data.properties.action_link });
-}
-
 export async function inviteUserAction(
   _prev: { error?: string; success?: boolean },
   formData: FormData
@@ -269,43 +253,28 @@ export async function inviteUserAction(
 
   const appUrl = await buildAppUrl();
 
-  // Verifica se já existe no Auth para obter o ID
-  const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-  const existing = listData?.users.find((u) => u.email === email);
+  // Envia convite — Supabase dispara o e-mail automaticamente
+  const { data: inviteData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+    email,
+    { redirectTo: `${appUrl}/auth/callback?next=/convite` }
+  );
 
-  let userId: string;
-
-  if (existing) {
-    // Usuário já existe no Auth (convite anterior) — só gera novo link
-    userId = existing.id;
-  } else {
-    // Cria o usuário no Auth sem enviar e-mail automaticamente
-    const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      email_confirm: false,
-    });
-    if (createError) {
-      if (createError.message.toLowerCase().includes("already")) return { error: "Este e-mail já está cadastrado." };
-      return { error: "Erro ao criar usuário." };
-    }
-    userId = created.user.id;
+  if (authError) {
+    if (authError.message.toLowerCase().includes("already")) return { error: "Este e-mail já está cadastrado." };
+    return { error: "Erro ao enviar convite." };
   }
 
   // Garante registro na tabela users
-  const { data: dbUser } = await supabaseAdmin.from("users").select("id").eq("id", userId).single();
+  const { data: dbUser } = await supabaseAdmin.from("users").select("id").eq("id", inviteData.user.id).single();
   if (!dbUser) {
     await supabaseAdmin.from("users").insert({
-      id: userId,
+      id: inviteData.user.id,
       tenant_id: tenantId,
       name,
       role,
       is_active: true,
     });
   }
-
-  // Envia e-mail via Resend
-  const { error: emailError } = await generateAndSendInvite(email, name, appUrl);
-  if (emailError) return { error: "Usuário cadastrado, mas houve falha ao enviar o e-mail de convite." };
 
   revalidatePath("/configuracoes");
   return { success: true };
@@ -317,7 +286,7 @@ export async function resendInviteAction(id: string): Promise<{ error?: string }
   // Garante que pertence ao mesmo tenant
   const { data: target } = await supabaseAdmin
     .from("users")
-    .select("id, name")
+    .select("id, name, role")
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .single();
@@ -328,8 +297,32 @@ export async function resendInviteAction(id: string): Promise<{ error?: string }
   const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.getUserById(id);
   if (authErr || !authData.user?.email) return { error: "Não foi possível obter o e-mail do usuário." };
 
+  const email = authData.user.email;
   const appUrl = await buildAppUrl();
-  return generateAndSendInvite(authData.user.email, target.name, appUrl);
+
+  // Remove o usuário não confirmado do Auth e da tabela para poder re-convidar
+  await supabaseAdmin.from("users").delete().eq("id", id).eq("tenant_id", tenantId);
+  await supabaseAdmin.auth.admin.deleteUser(id);
+
+  // Re-convida — Supabase gera novo ID e envia o e-mail automaticamente
+  const { data: newInvite, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+    email,
+    { redirectTo: `${appUrl}/auth/callback?next=/convite` }
+  );
+
+  if (inviteError) return { error: "Erro ao reenviar convite." };
+
+  // Recria o registro com o novo ID gerado pelo Supabase
+  await supabaseAdmin.from("users").insert({
+    id: newInvite.user.id,
+    tenant_id: tenantId,
+    name: target.name,
+    role: target.role,
+    is_active: true,
+  });
+
+  revalidatePath("/configuracoes");
+  return {};
 }
 
 export async function updateUserRoleAction(id: string, role: string): Promise<void> {

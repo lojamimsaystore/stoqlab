@@ -1,31 +1,31 @@
 import { createClient } from "./supabase/server";
+import { supabaseAdmin } from "./supabase/service";
 import { redirect } from "next/navigation";
 
-/** Retorna tenant_id extraído dos custom claims do JWT */
+/**
+ * Retorna tenant_id do usuário autenticado buscando no banco via supabaseAdmin.
+ * Usa getUser() (valida o JWT contra o servidor) em vez de getSession()
+ * para evitar que tokens manipulados no cookie falsifiquem o tenant_id.
+ */
 export async function getTenantId(): Promise<string> {
   const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-  if (!session?.access_token) redirect("/login");
+  const { data: profile } = await supabaseAdmin
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
 
-  try {
-    const payload = JSON.parse(atob(session.access_token.split(".")[1] ?? ""));
-    const tenantId = payload.tenant_id as string | undefined;
-    if (!tenantId) redirect("/login");
-    return tenantId;
-  } catch {
-    redirect("/login");
-  }
+  if (!profile?.tenant_id) redirect("/login");
+  return profile.tenant_id;
 }
 
 /** Retorna user + tenantId ou redireciona para login */
 export async function getAuthContext() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const tenantId = await getTenantId();

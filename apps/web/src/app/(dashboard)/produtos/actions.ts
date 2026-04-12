@@ -31,16 +31,26 @@ async function getOrCreateDefaultLocation(tenantId: string): Promise<string> {
 
 // ─── Helper: upload de foto ──────────────────────────────────
 
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
+const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "gif"] as const;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+
 async function uploadPhoto(
   file: File,
   tenantId: string,
   productId: string,
 ): Promise<string | null> {
+  // Valida tipo MIME e tamanho antes de qualquer upload
+  if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(file.type)) return null;
+  if (file.size > MAX_IMAGE_SIZE) return null;
+
+  const rawExt = (file.name.split(".").pop() ?? "jpg").toLowerCase();
+  const ext = (ALLOWED_IMAGE_EXTENSIONS as readonly string[]).includes(rawExt) ? rawExt : "jpg";
+
   try {
     // Garante que o bucket existe
     await supabaseAdmin.storage.createBucket("products", { public: true }).catch(() => {});
 
-    const ext = file.name.split(".").pop() ?? "jpg";
     const path = `${tenantId}/${productId}/cover.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -83,7 +93,7 @@ function generateSku(name: string, color: string, size: string): string {
       .replace(/[^A-Z0-9]/g, "")
       .slice(0, len);
   // Usa suffix aleatório para eliminar colisões quando nome+cor+tamanho são similares
-  const suffix = Math.floor(Math.random() * 900 + 100); // 3 dígitos
+  const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
   return `${clean(name, 4)}-${clean(color, 4)}-${size}-${suffix}`;
 }
 
@@ -485,9 +495,16 @@ export async function uploadTempPhotoAction(formData: FormData): Promise<string 
   const tenantId = await getTenantId();
   const photo = formData.get("photo") as File | null;
   if (!photo || photo.size === 0) return null;
+
+  // Valida tipo MIME e tamanho antes de qualquer upload
+  if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(photo.type)) return null;
+  if (photo.size > MAX_IMAGE_SIZE) return null;
+
+  const rawExt = (photo.name.split(".").pop() ?? "jpg").toLowerCase();
+  const ext = (ALLOWED_IMAGE_EXTENSIONS as readonly string[]).includes(rawExt) ? rawExt : "jpg";
+
   try {
     await supabaseAdmin.storage.createBucket("products", { public: true }).catch(() => {});
-    const ext = photo.name.split(".").pop() ?? "jpg";
     const path = `${tenantId}/pending/${Date.now()}.${ext}`;
     const buffer = Buffer.from(await photo.arrayBuffer());
     const { error } = await supabaseAdmin.storage

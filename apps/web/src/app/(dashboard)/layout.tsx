@@ -19,12 +19,18 @@ export default async function DashboardLayout({
 
   const { data: profile } = await supabaseAdmin
     .from("users")
-    .select("name, role, tenant_id, tenants(name)")
+    .select("name, role, tenant_id, is_active, tenants(name)")
     .eq("id", user.id)
     .single();
 
   // Master users have their own panel
   if (profile?.role === "master") redirect("/admin");
+
+  // Encerra sessão de usuários desativados pelo proprietário
+  if (profile?.is_active === false) {
+    await supabase.auth.signOut();
+    redirect("/login");
+  }
 
   const userName = profile?.name ?? "Usuário";
   const userRole = profile?.role ?? "owner";

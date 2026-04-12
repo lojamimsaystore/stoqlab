@@ -21,11 +21,14 @@ function createLimiter(requests: number, window: `${number} ${"s" | "m" | "h" | 
   });
 }
 
-// Login: 10 tentativas por minuto por IP
-const loginLimiter = createLimiter(10, "1 m");
+// Login: 5 tentativas por 10 minutos por IP
+const loginLimiter = createLimiter(5, "10 m");
 
 // Registro: 5 contas por hora por IP
 const registerLimiter = createLimiter(5, "1 h");
+
+// Actions críticas: 60 operações por minuto por usuário
+const actionLimiter = createLimiter(60, "1 m");
 
 export type RateLimitResult =
   | { success: true }
@@ -50,4 +53,17 @@ export async function checkLoginLimit(ip: string): Promise<RateLimitResult> {
 
 export async function checkRegisterLimit(ip: string): Promise<RateLimitResult> {
   return check(registerLimiter, `register:${ip}`);
+}
+
+/**
+ * Rate limit para Server Actions críticas (criar venda, compra, ajustar estoque).
+ * Limita por userId para evitar abuso de usuários autenticados.
+ * @param userId  ID do usuário autenticado
+ * @param action  Nome da action (ex: "create_sale")
+ */
+export async function checkActionLimit(
+  userId: string,
+  action: string,
+): Promise<RateLimitResult> {
+  return check(actionLimiter, `action:${action}:${userId}`);
 }

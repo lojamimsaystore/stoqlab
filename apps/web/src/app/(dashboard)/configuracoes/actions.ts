@@ -7,6 +7,28 @@ import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 
+// ─── Guard de role ────────────────────────────────────────────
+
+/**
+ * Lança erro se o usuário autenticado não for `owner` do tenant.
+ * Deve ser chamado logo após getTenantId() em todas as actions
+ * restritas ao proprietário da loja.
+ */
+async function assertOwner(tenantId: string): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Não autenticado.");
+
+  const { data: profile } = await supabaseAdmin
+    .from("users")
+    .select("role")
+    .eq("id", user.id)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (profile?.role !== "owner") throw new Error("Acesso negado.");
+}
+
 // ─── Dados da loja ────────────────────────────────────────────
 
 export async function updateTenantAction(
@@ -14,6 +36,7 @@ export async function updateTenantAction(
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
   const tenantId = await getTenantId();
+  await assertOwner(tenantId);
   const name = (formData.get("name") as string)?.trim();
   const phone = (formData.get("phone") as string)?.trim() || null;
   const address = (formData.get("address") as string)?.trim() || null;
@@ -46,6 +69,7 @@ export async function updateInformacoesAction(
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
   const tenantId = await getTenantId();
+  await assertOwner(tenantId);
 
   const rawThreshold = parseInt(formData.get("low_stock_threshold") as string, 10);
   const low_stock_threshold = Number.isFinite(rawThreshold)
@@ -90,6 +114,7 @@ export async function saveActionPermissionsAction(
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
   const tenantId = await getTenantId();
+  await assertOwner(tenantId);
 
   const roles = ["manager", "seller", "stock_operator"] as const;
   const { ACTION_KEYS } = await import("@/lib/action-permissions");
@@ -149,7 +174,7 @@ export async function updatePasswordAction(
   const password = formData.get("password") as string;
   const confirm = formData.get("confirm") as string;
 
-  if (!password || password.length < 6) return { error: "Senha deve ter ao menos 6 caracteres." };
+  if (!password || password.length < 10) return { error: "Senha deve ter ao menos 10 caracteres." };
   if (password !== confirm) return { error: "As senhas não coincidem." };
 
   const { error } = await supabase.auth.updateUser({ password });
@@ -165,6 +190,7 @@ export async function createLocationAction(
   formData: FormData
 ): Promise<{ error?: string }> {
   const tenantId = await getTenantId();
+  await assertOwner(tenantId);
   const name = (formData.get("name") as string)?.trim();
   const type = (formData.get("type") as string) || "store";
 
@@ -189,6 +215,7 @@ export async function updateLocationAction(
   type: string,
 ): Promise<{ error?: string }> {
   const tenantId = await getTenantId();
+  await assertOwner(tenantId);
   const trimmed = name.trim();
   if (!trimmed) return { error: "Nome obrigatório" };
 
@@ -223,6 +250,7 @@ export async function updateLocationAction(
 
 export async function deleteLocationAction(id: string): Promise<{ error?: string }> {
   const tenantId = await getTenantId();
+  await assertOwner(tenantId);
 
   const { data: inventoryItems } = await supabaseAdmin
     .from("inventory")
@@ -284,29 +312,29 @@ export async function inviteUserAction(
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
   const tenantId = await getTenantId();
+  await assertOwner(tenantId);
   const email = (formData.get("email") as string)?.trim();
   const name = (formData.get("name") as string)?.trim();
-  const password = (formData.get("password") as string);
   const role = formData.get("role") as string;
 
   if (!email || !name) return { error: "Nome e e-mail obrigatórios." };
-  if (!password || password.length < 6) return { error: "Senha deve ter ao menos 6 caracteres." };
   if (!VALID_ROLES.includes(role as typeof VALID_ROLES[number])) return { error: "Perfil inválido." };
 
-  // Cria o usuário com senha definida e e-mail já confirmado
-  const { data: created, error: authError } = await supabaseAdmin.auth.admin.createUser({
+  const appUrl = await buildAppUrl();
+
+  // Envia convite por e-mail — o usuário define a própria senha ao aceitar
+  const { data: invited, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
     email,
-    password,
-    email_confirm: true,
-  });
+    { redirectTo: `${appUrl}/auth/callback?next=/convite` }
+  );
 
   if (authError) {
     if (authError.message.toLowerCase().includes("already")) return { error: "Este e-mail já está cadastrado." };
-    return { error: "Erro ao criar usuário." };
+    return { error: "Erro ao enviar convite." };
   }
 
   await supabaseAdmin.from("users").insert({
-    id: created.user.id,
+    id: invited.user.id,
     tenant_id: tenantId,
     name,
     role,
@@ -319,6 +347,7 @@ export async function inviteUserAction(
 
 export async function resendInviteAction(id: string): Promise<{ error?: string }> {
   const tenantId = await getTenantId();
+  await assertOwner(tenantId);
 
   // Garante que pertence ao mesmo tenant
   const { data: target } = await supabaseAdmin
@@ -364,6 +393,7 @@ export async function resendInviteAction(id: string): Promise<{ error?: string }
 
 export async function updateUserRoleAction(id: string, role: string): Promise<void> {
   const tenantId = await getTenantId();
+  await assertOwner(tenantId);
   if (!VALID_ROLES.includes(role as typeof VALID_ROLES[number])) return;
 
   const { data: before } = await supabaseAdmin
@@ -393,6 +423,7 @@ export async function updateUserRoleAction(id: string, role: string): Promise<vo
 
 export async function toggleUserActiveAction(id: string, active: boolean): Promise<void> {
   const tenantId = await getTenantId();
+  await assertOwner(tenantId);
 
   await supabaseAdmin
     .from("users")
@@ -413,6 +444,7 @@ export async function toggleUserActiveAction(id: string, active: boolean): Promi
 
 export async function deleteUserAction(id: string): Promise<{ error?: string }> {
   const tenantId = await getTenantId();
+  await assertOwner(tenantId);
 
   const supabase = await createClient();
   const { data: { user: currentUser } } = await supabase.auth.getUser();

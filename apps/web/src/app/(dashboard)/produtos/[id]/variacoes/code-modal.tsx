@@ -61,13 +61,20 @@ export function CodeModal({ open, onClose, type, sku, label, variantId }: Props)
     if (!dataUrl) return;
     const win = window.open("", "_blank");
     if (!win) return;
+    // Escapa entidades HTML para prevenir XSS via nome de cor/tamanho
+    const safeLabel = label
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
     win.document.write(`
-      <html><head><title>${label}</title>
+      <html><head><title>${safeLabel}</title>
       <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;margin:0;}
       img{max-width:300px;}p{font-size:14px;font-weight:600;color:#0f172a;margin-top:12px;}</style>
       </head><body>
       <img src="${dataUrl}" />
-      <p>${label}</p>
+      <p>${safeLabel}</p>
       <script>window.onload=()=>{window.print();window.close();}<\/script>
       </body></html>
     `);

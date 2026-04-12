@@ -154,31 +154,40 @@ export default async function ScanPage({
           </div>
         </div>
 
-        {/* Estoque por loja */}
-        {locationsWithStock.length > 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-slate-100">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                Estoque disponível · {totalStock} {totalStock === 1 ? "peça" : "peças"}
-              </p>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {locationsWithStock.map((loc) => (
-                <div key={loc.id} className="flex items-center justify-between px-5 py-3">
-                  <div className="flex items-center gap-2">
-                    <MapPin size={13} className="text-slate-400 shrink-0" />
-                    <span className="text-sm text-slate-700">{loc.name}</span>
+        {/* Estoque — detalhado apenas para membros autenticados do tenant */}
+        {canSell ? (
+          locationsWithStock.length > 0 ? (
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  Estoque disponível · {totalStock} {totalStock === 1 ? "peça" : "peças"}
+                </p>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {locationsWithStock.map((loc) => (
+                  <div key={loc.id} className="flex items-center justify-between px-5 py-3">
+                    <div className="flex items-center gap-2">
+                      <MapPin size={13} className="text-slate-400 shrink-0" />
+                      <span className="text-sm text-slate-700">{loc.name}</span>
+                    </div>
+                    <span className="text-sm font-bold text-slate-900">
+                      {loc.quantity} {loc.quantity === 1 ? "peça" : "peças"}
+                    </span>
                   </div>
-                  <span className="text-sm font-bold text-slate-900">
-                    {loc.quantity} {loc.quantity === 1 ? "peça" : "peças"}
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-sm px-5 py-4">
+              <p className="text-sm text-red-600 font-medium text-center">Sem estoque disponível</p>
+            </div>
+          )
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm px-5 py-4">
-            <p className="text-sm text-red-600 font-medium text-center">Sem estoque disponível</p>
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-4 flex items-center justify-between">
+            <span className="text-sm text-slate-600">Disponibilidade</span>
+            <span className={`text-sm font-bold ${totalStock > 0 ? "text-emerald-600" : "text-red-500"}`}>
+              {totalStock > 0 ? "Disponível" : "Indisponível"}
+            </span>
           </div>
         )}
 

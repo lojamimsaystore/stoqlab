@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { adjustInventory } from "@/lib/inventory";
+import { checkActionLimit } from "@/lib/rate-limit";
 
 const itemSchema = z.object({
   variantId: z.string().uuid(),
@@ -33,7 +35,7 @@ const purchaseSchema = z.object({
 function generateSku(name: string, color: string, size: string): string {
   const clean = (s: string, len: number) =>
     s.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "").slice(0, len);
-  const suffix = Math.floor(Math.random() * 900 + 100); // 3 dígitos — evita colisão de SKU
+  const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
   return `${clean(name, 4)}-${clean(color, 4)}-${size}-${suffix}`;
 }
 
@@ -100,6 +102,12 @@ export async function createPurchaseAction(
 }
 
 async function _createPurchase(formData: FormData): Promise<PurchaseState> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Não autenticado." };
+  const rl = await checkActionLimit(user.id, "create_purchase");
+  if (!rl.success) return { error: `Muitas operações. Tente novamente em ${rl.retryAfter}s.` };
+
   const tenantId = await getTenantId();
 
   // Parse pending products e variants
@@ -257,8 +265,9 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
     .single();
 
   if (purchaseError) {
+    console.error("[createPurchase] purchaseError:", purchaseError.message, purchaseError.code);
     await rollback();
-    return { error: `[DEBUG] ${purchaseError.message} (${purchaseError.code})` };
+    return { error: "Erro ao registrar a compra. Tente novamente." };
   }
 
   // Upload NF (se enviada)
@@ -288,6 +297,19 @@ async function _createPurchase(formData: FormData): Promise<PurchaseState> {
     await rollback();
     return { error: "Erro ao salvar itens da compra." };
   }
+
+  await writeAuditLog({
+    tenantId,
+    action: "purchase.created",
+    tableName: "purchases",
+    recordId: purchase.id,
+    newData: {
+      invoice_number: invoiceNumber,
+      supplier_id: supplierId,
+      total_items: totalItems,
+      products_cost: productsCost,
+    } as Record<string, unknown>,
+  });
 
   // 3. Atualizar estoque (atômico via RPC — sem race condition) e registrar movimentações
   const adjustedItems: { variantId: string; quantity: number }[] = [];
@@ -383,12 +405,21 @@ export async function updatePurchaseAction(
   const locationId = (currentPurchase as unknown as { location_id: string }).location_id;
   const currentItems = currentPurchase.purchase_items as { variant_id: string; quantity: number; unit_cost: string }[];
 
-  // Reverte estoque dos itens antigos (desfaz a entrada — delta negativo atômico)
+  const { supplierId, invoiceNumber, purchasedAt, paymentMethod, freightCost, otherCosts, notes } = parsed.data;
+
+  // Reverte estoque dos itens antigos e registra movimentos de estorno (imutabilidade do log)
   for (const item of currentItems ?? []) {
     await adjustInventory(tenantId, item.variant_id, locationId, -Number(item.quantity));
+    await supabaseAdmin.from("inventory_movements").insert({
+      tenant_id: tenantId,
+      variant_id: item.variant_id,
+      location_id: locationId,
+      quantity_delta: -Number(item.quantity),
+      movement_type: "adjustment",
+      reference_id: id,
+      note: `Estorno de compra ${invoiceNumber ?? id.slice(0, 8)} (edição)`,
+    });
   }
-
-  const { supplierId, invoiceNumber, purchasedAt, paymentMethod, freightCost, otherCosts, notes } = parsed.data;
 
   const totalItems = parsed.data.items.reduce((s, i) => s + i.quantity, 0);
   const productsCost = parsed.data.items.reduce((s, i) => s + i.quantity * i.unitCost, 0);
@@ -411,8 +442,7 @@ export async function updatePurchaseAction(
     .eq("id", id)
     .eq("tenant_id", tenantId);
 
-  // Remove itens e movimentos antigos
-  await supabaseAdmin.from("inventory_movements").delete().eq("reference_id", id);
+  // Remove apenas os itens antigos (movimentos são mantidos — estornos já foram inseridos acima)
   await supabaseAdmin.from("purchase_items").delete().eq("purchase_id", id);
 
   // Insere novos itens

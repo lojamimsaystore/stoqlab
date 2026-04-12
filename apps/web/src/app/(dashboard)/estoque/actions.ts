@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
+import { checkActionLimit } from "@/lib/rate-limit";
 
 const adjustSchema = z.object({
   variantId: z.string().uuid(),
@@ -18,6 +20,12 @@ export async function adjustInventoryAction(
   _prev: AdjustState,
   formData: FormData
 ): Promise<AdjustState> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Não autenticado." };
+  const rl = await checkActionLimit(user.id, "adjust_inventory");
+  if (!rl.success) return { error: `Muitas operações. Tente novamente em ${rl.retryAfter}s.` };
+
   const tenantId = await getTenantId();
 
   const parsed = adjustSchema.safeParse({

@@ -522,6 +522,8 @@ ALTER TABLE transfer_items     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE price_history      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_log          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE debts              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE debt_payments      ENABLE ROW LEVEL SECURITY;
 
 -- Políticas: cada tabela só retorna dados do tenant do usuário logado
 

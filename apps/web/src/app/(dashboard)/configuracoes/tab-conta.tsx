@@ -60,12 +60,12 @@ export function TabConta({ user }: {
       {/* Senha */}
       <div>
         <h3 className="font-semibold text-slate-900 mb-1">Alterar senha</h3>
-        <p className="text-sm text-slate-500 mb-5">Escolha uma senha com ao menos 6 caracteres.</p>
+        <p className="text-sm text-slate-500 mb-5">Escolha uma senha com ao menos 10 caracteres.</p>
 
         <form action={passwordAction} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Nova senha</label>
-            <input name="password" type="password" required minLength={6}
+            <input name="password" type="password" required minLength={10}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="••••••••" />
           </div>

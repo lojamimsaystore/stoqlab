@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { adjustInventory } from "@/lib/inventory";
+import { checkActionLimit } from "@/lib/rate-limit";
 
 export type CustomerResult = {
   id: string;
@@ -37,6 +39,12 @@ export async function createSaleAction(
   _prev: SaleState,
   formData: FormData
 ): Promise<SaleState> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Não autenticado." };
+  const rl = await checkActionLimit(user.id, "create_sale");
+  if (!rl.success) return { error: `Muitas operações. Tente novamente em ${rl.retryAfter}s.` };
+
   const tenantId = await getTenantId();
 
   let items: unknown[];
@@ -172,6 +180,19 @@ export async function createSaleAction(
     return { error: "Erro ao salvar itens da venda." };
   }
 
+  await writeAuditLog({
+    tenantId,
+    action: "sale.created",
+    tableName: "sales",
+    recordId: sale.id,
+    newData: {
+      payment_method: actualPaymentMethod,
+      total_value: totalValue,
+      channel: parsed.data.channel,
+      items_count: parsed.data.items.length,
+    } as Record<string, unknown>,
+  });
+
   // Baixa estoque (atômico via RPC — sem race condition)
   for (const item of parsed.data.items) {
     const invResult = await adjustInventory(tenantId, item.variantId, locationId, -item.quantity);
@@ -267,9 +288,18 @@ export async function updateSaleAction(
   const locationId = (currentSale as unknown as { location_id: string }).location_id;
   const currentItems = currentSale.sale_items as { variant_id: string; quantity: number }[];
 
-  // Reverte estoque dos itens antigos (devolve ao estoque — delta positivo atômico)
+  // Reverte estoque dos itens antigos e registra movimentos de estorno (imutabilidade do log)
   for (const item of currentItems ?? []) {
     await adjustInventory(tenantId, item.variant_id, locationId, Number(item.quantity));
+    await supabaseAdmin.from("inventory_movements").insert({
+      tenant_id: tenantId,
+      variant_id: item.variant_id,
+      location_id: locationId,
+      quantity_delta: Number(item.quantity),
+      movement_type: "adjustment",
+      reference_id: id,
+      note: `Estorno de venda ${id.slice(0, 8)} (edição)`,
+    });
   }
 
   // Valida estoque para os novos itens
@@ -350,8 +380,7 @@ export async function updateSaleAction(
     .eq("id", id)
     .eq("tenant_id", tenantId);
 
-  // Remove itens e movimentos antigos
-  await supabaseAdmin.from("inventory_movements").delete().eq("reference_id", id);
+  // Remove apenas os itens antigos (movimentos são mantidos — estornos já foram inseridos acima)
   await supabaseAdmin.from("sale_items").delete().eq("sale_id", id);
 
   // Insere novos itens

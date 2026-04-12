@@ -49,12 +49,18 @@ export async function loginAction(
     return { error: "Email ou senha incorretos." };
   }
 
-  // Busca role e permissões do tenant para calcular o redirect correto
+  // Busca role, status e permissões do tenant para calcular o redirect correto
   const { data: profile } = await supabaseAdmin
     .from("users")
-    .select("role, tenant_id")
+    .select("role, tenant_id, is_active")
     .eq("id", data.user.id)
     .single();
+
+  // Bloqueia usuários desativados antes de criar a sessão
+  if (profile?.is_active === false) {
+    await supabase.auth.signOut();
+    return { error: "Sua conta está desativada. Entre em contato com o administrador da loja." };
+  }
 
   if (!profile?.tenant_id) {
     return { success: true, redirectTo: "/completar-cadastro" };

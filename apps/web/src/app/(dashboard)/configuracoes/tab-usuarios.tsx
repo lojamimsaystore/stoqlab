@@ -3,7 +3,7 @@
 import { useFormState, useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Trash2, Send, Eye, EyeOff } from "lucide-react";
+import { Trash2, Send } from "lucide-react";
 import { inviteUserAction, updateUserRoleAction, toggleUserActiveAction, deleteUserAction, resendInviteAction } from "./actions";
 
 function SubmitButton() {
@@ -33,7 +33,6 @@ export function TabUsuarios({ users, currentUserId }: {
   const [state, formAction] = useFormState(inviteUserAction, {});
   const router = useRouter();
   const [resending, setResending] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
 
   async function handleRoleChange(id: string, role: string) {
     await updateUserRoleAction(id, role);
@@ -150,33 +149,15 @@ export function TabUsuarios({ users, currentUserId }: {
 
       {/* Adicionar usuário */}
       <div>
-        <h3 className="font-semibold text-slate-900 mb-1">Adicionar usuário</h3>
-        <p className="text-sm text-slate-500 mb-4">O usuário poderá entrar imediatamente com as credenciais definidas.</p>
+        <h3 className="font-semibold text-slate-900 mb-1">Convidar usuário</h3>
+        <p className="text-sm text-slate-500 mb-4">Um e-mail de convite será enviado. O usuário define a própria senha ao aceitar.</p>
 
         <form action={formAction} className="flex flex-col gap-3">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <input name="name" required placeholder="Nome completo"
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             <input name="email" type="email" required placeholder="E-mail"
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            <div className="relative">
-              <input
-                name="password"
-                type={showPassword ? "text" : "password"}
-                required
-                minLength={6}
-                placeholder="Senha (mín. 6 caracteres)"
-                className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((p) => !p)}
-                tabIndex={-1}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
             <select name="role"
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
               <option value="seller">Vendedor</option>
@@ -188,7 +169,7 @@ export function TabUsuarios({ users, currentUserId }: {
           <div className="flex items-center gap-3">
             <SubmitButton />
             {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-            {state.success && <p className="text-sm text-emerald-600">Usuário criado com sucesso!</p>}
+            {state.success && <p className="text-sm text-emerald-600">Convite enviado com sucesso!</p>}
           </div>
         </form>
       </div>

@@ -4,9 +4,11 @@ import { headers } from "next/headers";
 
 export type AuditAction =
   // Vendas
+  | "sale.created"
   | "sale.deleted"
   | "sale.updated"
   // Compras
+  | "purchase.created"
   | "purchase.deleted"
   | "purchase.updated"
   | "purchase.status_changed"
